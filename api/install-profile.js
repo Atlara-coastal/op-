@@ -6,7 +6,7 @@
  */
 import { WEBCLIP_ICON_BASE64 } from './_webclip-icon.js';
 
-const APP_URL = 'https://op-ventascredito.vercel.app/';
+const APP_URL = 'https://opgestion.vercel.app/';
 
 // Fixed UUIDs so re-installing updates the same profile instead of duplicating it.
 const PROFILE_UUID = '6958B970-C773-413A-914D-1FFEFAF30A5A';

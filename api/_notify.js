@@ -16,7 +16,7 @@ export function getMessaging() {
   return fcmMessaging();
 }
 
-export const TODAY_LINK = 'https://op-ventascredito.vercel.app/?tab=today';
+export const TODAY_LINK = 'https://opgestion.vercel.app/?tab=today';
 const TAG = 'jocoadmin-due';
 
 // One short line; tapping the notification opens the "Cobros de hoy" list.
