@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#241333"/><stop offset="1" stop-color="#0a0612"/></linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".11"/><stop offset=".55" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="opg" gradientUnits="userSpaceOnUse" x1="70" y1="180" x2="442" y2="332"><stop offset="0" stop-color="#c084fc"/><stop offset=".55" stop-color="#a855f7"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#tile)"/>
+  <rect width="512" height="512" fill="url(#sheen)"/>
+  <text x="256" y="300" font-family="Arial, Segoe UI, sans-serif" font-weight="800" font-size="190" text-anchor="middle" fill="#c084fc" opacity=".45" filter="url(#glow)">OP</text>
+  <text x="256" y="300" font-family="Arial, Segoe UI, sans-serif" font-weight="800" font-size="190" text-anchor="middle" fill="url(#opg)">OP</text>
+</svg>

@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "name": "op-admin",
+  "cleanUrls": true,
+  "buildCommand": "node build.js",
+  "outputDirectory": "www",
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+name: Cobros diarios (prueba manual)
+
+# El envío real de las 11:00, 13:00 y 15:00 (hora Colombia) ya no corre aquí: GitHub Actions
+# puede retrasar los jobs programados varias horas, así que el disparo en punto ahora vive
+# dentro de la base de datos (pg_cron + pg_net en Supabase, ver supabase/migrations). Este
+# workflow se queda solo como botón manual para probar el envío sin esperar a la hora.
+on:
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'Solo simular (no envía notificaciones)'
+        type: boolean
+        default: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Llamar al servidor
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          DRY: ${{ inputs.dry }}
+        run: |
+          url="https://op-ventascredito.vercel.app/api/send-due-notifications"
+          if [ "$DRY" = "true" ]; then url="$url?dry=1"; fi
+          echo "Llamando $url a $(date -u +%T) UTC"
+          curl -fsS --retry 3 --retry-delay 15 -H "Authorization: Bearer $CRON_SECRET" "$url"

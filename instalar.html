@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Instalar OP</title>
+  <meta name="theme-color" content="#0a0612">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #0a0612; color: #e2e8f0; font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); }
+    main { max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+    .brand img { width: 56px; height: 56px; border-radius: 14px; }
+    h1 { font-size: 24px; margin: 0; font-weight: 800; letter-spacing: -.02em; }
+    p.sub { margin: 2px 0 0; color: #ab9bc4; font-size: 13px; }
+    .card { background: #130c1e; border: 1px solid #2e1a45; border-radius: 18px; padding: 18px; }
+    .card h2 { margin: 0 0 4px; font-size: 16px; }
+    .card p { margin: 0 0 12px; color: #ab9bc4; font-size: 13px; line-height: 1.5; }
+    ol { margin: 0 0 14px; padding-left: 20px; color: #cbd5e1; font-size: 13px; line-height: 1.7; }
+    .btn { display: block; text-align: center; text-decoration: none; padding: 13px 16px; border-radius: 14px; font-weight: 700; font-size: 14px; background: linear-gradient(135deg, #9333ea, #f59e0b); color: #fffaf0; }
+    .btn.ghost { background: transparent; color: #c084fc; border: 1px solid #6b21a8; }
+    .note { font-size: 12px; color: #7c6a94; line-height: 1.5; }
+    code { background: #1c1030; padding: 1px 6px; border-radius: 6px; color: #d8b4fe; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">
+      <img src="./icons/icon-192.png" alt="OP">
+      <div>
+        <h1>OP</h1>
+        <p class="sub">Instala la app en tu celular</p>
+      </div>
+    </div>
+
+    <section class="card" id="ios">
+      <h2>iPhone</h2>
+      <p>Toca el botón, luego en <b>Ajustes</b> verás "Perfil descargado". Instálalo y el icono de OP aparecerá en tu pantalla de inicio.</p>
+      <ol>
+        <li>Abre esta página en <b>Safari</b>.</li>
+        <li>Toca <b>Instalar en iPhone</b> y luego <b>Permitir</b>.</li>
+        <li>Ve a <b>Ajustes &rarr; Perfil descargado</b> y toca <b>Instalar</b> (iOS mostrará "No firmado": es normal).</li>
+      </ol>
+      <a class="btn" href="/api/install-profile">Instalar en iPhone</a>
+      <p class="note" style="margin-top:12px">Alternativa manual: en Safari toca <b>Compartir</b> &rarr; <b>Agregar a inicio</b>.</p>
+    </section>
+
+    <section class="card" id="android">
+      <h2>Android</h2>
+      <ol>
+        <li>Abre esta página en <b>Chrome</b>.</li>
+        <li>Toca el menú <b>&#8942;</b> &rarr; <b>Instalar app</b> (o "Agregar a pantalla de inicio").</li>
+      </ol>
+      <a class="btn ghost" href="/">Abrir OP</a>
+    </section>
+
+    <p class="note">Enlace de la app: <code>op-ventascredito.vercel.app</code></p>
+  </main>
+</body>
+</html>

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>OP - Sistema de Ventas, Crédito y Gestión de Cartera</title>
+  <meta name="description" content="Plataforma profesional para la gestión de ventas al contado y a crédito, cotizaciones, clasificación de clientes por tipos (1, 2, 3), anexos de cédulas (CC) y control de cartera.">
+
+  <!-- Apply saved theme before first paint to avoid a light/dark flash -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('crediventas_theme');
+        var theme = saved === 'light' || saved === 'dark'
+          ? saved
+          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS: compiled statically at build time (see tailwind.config.js / build.js).
+       Using the CDN runtime compiler here would mean no styling until a network
+       round-trip finishes on every cold start, which is unreliable inside the
+       packaged Android/iOS WebView. -->
+  <link rel="stylesheet" href="./tailwind.build.css">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Chart.js for Financial Data Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Canvas-Confetti for Payment Celebration -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- GSAP for lightweight UI transitions (tab switches, modals) -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+
+  <!-- Firebase Messaging (web push for iOS/browser) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
+
+  <!-- Supabase Client (cloud database, auth) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <!-- PWA & Mobile Web App Meta Tags -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#faf5ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="OP">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png">
+
+  <!-- Custom Design System Stylesheet -->
+  <link rel="stylesheet" href="./styles.css">
+</head>
+
+<body class="min-h-screen selection:bg-cyan-300 selection:text-cyan-950">
+
+  <!-- Animated launch splash (once per session) -->
+  <div id="splash" aria-hidden="true">
+    <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="sp-tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#241333"/><stop offset="1" stop-color="#0a0612"/></linearGradient>
+        <linearGradient id="sp-sheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".11"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></linearGradient>
+        <linearGradient id="sp-og" gradientUnits="userSpaceOnUse" x1="70" y1="180" x2="442" y2="332"><stop offset="0" stop-color="#c084fc"/><stop offset=".55" stop-color="#a855f7"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
+        <filter id="sp-blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="16"/></filter>
+      </defs>
+      <g class="sp-tile">
+        <rect x="4" y="4" width="504" height="504" rx="116" fill="url(#sp-tile)"/>
+        <rect x="4" y="4" width="504" height="504" rx="116" fill="url(#sp-sheen)"/>
+        <rect x="5" y="5" width="502" height="502" rx="115" fill="none" stroke="#fff" stroke-opacity=".10" stroke-width="2"/>
+        <text class="sp-glow" x="256" y="330" font-family="Arial, Segoe UI, sans-serif" font-weight="800" font-size="220" text-anchor="middle" fill="#c084fc" filter="url(#sp-blur)">OP</text>
+        <text class="sp-letters" x="256" y="330" font-family="Arial, Segoe UI, sans-serif" font-weight="800" font-size="220" text-anchor="middle" fill="url(#sp-og)">OP</text>
+      </g>
+    </svg>
+    <div class="sp-word">OP</div>
+  </div>
+  <script>
+    (function () {
+      var s = document.getElementById('splash');
+      var done = function () { if (s && s.parentNode) s.parentNode.removeChild(s); };
+      try {
+        if (sessionStorage.getItem('jocoSplash')) return done();
+        sessionStorage.setItem('jocoSplash', '1');
+      } catch (e) { /* storage blocked: still show once */ }
+      setTimeout(done, 2600);
+    })();
+  </script>
+
+  <!-- Login Screen: shown until a Supabase session is established -->
+  <div id="login-screen" class="fixed inset-0 z-[100] flex items-center justify-center px-4 pt-safe pb-safe">
+    <form id="login-form" class="w-full max-w-sm mx-auto glass-panel p-7 space-y-5 animate-fade-in" autocomplete="on">
+      <div class="flex flex-col items-center gap-3 text-center">
+        <div class="w-14 h-14 rounded-2xl bg-[image:var(--primary-gradient)] p-0.5 shadow-[var(--shadow-glow)]">
+          <div class="w-full h-full rounded-[14px] overflow-hidden">
+            <img src="./icons/icon.svg" alt="OP" class="w-full h-full object-cover">
+          </div>
+        </div>
+        <div>
+          <h1 class="text-xl font-black tracking-tight font-['Outfit']" style="color: var(--text-main);">OP</h1>
+          <p class="text-xs mt-1" style="color: var(--text-muted);">Inicia sesión para continuar</p>
+        </div>
+      </div>
+
+      <div id="login-error" class="hidden text-xs font-semibold text-center py-2 px-3 rounded-xl" style="background: var(--danger-bg); color: var(--danger);"></div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="text-[11px] font-bold uppercase tracking-wider block mb-1.5" style="color: var(--text-muted);">Usuario</label>
+          <input id="login-username" name="username" type="text" required autocomplete="username" class="input-field w-full px-4 py-3 text-sm" placeholder="tu.usuario">
+        </div>
+        <div>
+          <label class="text-[11px] font-bold uppercase tracking-wider block mb-1.5" style="color: var(--text-muted);">Contraseña</label>
+          <input id="login-password" name="password" type="password" required autocomplete="current-password" class="input-field w-full px-4 py-3 text-sm" placeholder="••••••••">
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+        <i data-lucide="log-in" class="w-4 h-4"></i> Ingresar
+      </button>
+
+      <a href="/instalar" class="block text-center text-xs font-semibold" style="color: var(--primary);">¿Cómo instalar la app en tu celular?</a>
+    </form>
+  </div>
+
+  <!-- App Shell: hidden until authenticated -->
+  <div id="app-shell" class="hidden">
+
+  <!-- Top Glassmorphism Navigation Bar -->
+  <header class="sticky top-0 z-40 glass-nav pt-safe">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
+      
+      <!-- Brand Logo (click = go home) -->
+      <div id="brand-home" role="button" tabindex="0" title="Ir al inicio" class="flex items-center gap-3 cursor-pointer select-none">
+        <div class="w-10 h-10 rounded-xl p-0.5" style="background: var(--bg-card-solid); border: 1px solid var(--border-color);">
+          <div class="w-full h-full rounded-[10px] overflow-hidden">
+            <img src="./icons/icon.svg" alt="OP" class="w-full h-full object-cover">
+          </div>
+        </div>
+        <div>
+          <span class="text-lg sm:text-xl font-black tracking-tight flex items-center gap-1.5 font-['Outfit'] truncate" style="color: var(--text-main);">
+            OP
+          </span>
+          <p class="text-[10px] hidden sm:block" style="color: var(--text-muted);">Ventas &bull; Créditos &bull; Cartera &bull; Clientes</p>
+        </div>
+      </div>
+
+      <!-- Desktop Navigation Links -->
+      <nav class="hidden md:flex items-center gap-1 p-1.5 rounded-2xl" style="background: var(--bg-card); border: 1px solid var(--border-color);">
+        <button data-tab-target="dashboard" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Panel
+        </button>
+        <button data-tab-target="products" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+          <i data-lucide="tag" class="w-4 h-4"></i> Productos
+        </button>
+        <button data-tab-target="quotes" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+          <i data-lucide="file-text" class="w-4 h-4"></i> Cotizaciones
+        </button>
+        <button data-tab-target="clients" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+          <i data-lucide="users" class="w-4 h-4"></i> Clientes (CC)
+        </button>
+        <button data-tab-target="sales" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+          <i data-lucide="receipt" class="w-4 h-4"></i> Ventas & Abonos
+        </button>
+        <button data-tab-target="portfolio" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+          <i data-lucide="shield-alert" class="w-4 h-4"></i> Cartera
+        </button>
+        <button data-tab-target="today" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+          <i data-lucide="calendar-clock" class="w-4 h-4"></i> Cobros hoy
+        </button>
+      </nav>
+
+      <!-- Right Utility Actions -->
+      <div class="flex items-center gap-2">
+        <button id="sync-status-btn" title="Cambios pendientes de sincronizar" class="hidden relative btn-glass p-2 rounded-xl transition-all text-xs font-medium flex items-center gap-1.5">
+          <i data-lucide="cloud-off" class="w-4 h-4" style="color: var(--warning);"></i>
+          <span id="sync-status-count" class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center" style="background: var(--warning); color: #000;"></span>
+        </button>
+
+        <button id="theme-toggle-btn" title="Cambiar tema" class="btn-glass p-2 rounded-xl transition-all text-xs font-medium flex items-center gap-1.5">
+          <i data-lucide="moon" class="w-4 h-4" style="color: var(--primary);"></i>
+        </button>
+
+        <button id="export-backup-btn" title="Descargar copia de seguridad JSON" class="btn-glass hidden md:flex p-2 rounded-xl transition-all text-xs font-medium flex items-center gap-1.5">
+          <i data-lucide="download" class="w-4 h-4" style="color: var(--primary);"></i> <span class="hidden lg:inline">Backup</span>
+        </button>
+
+        <label title="Restaurar copia de seguridad" class="btn-glass hidden md:flex p-2 rounded-xl transition-all text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+          <i data-lucide="upload" class="w-4 h-4" style="color: var(--primary);"></i> <span class="hidden lg:inline">Restaurar</span>
+          <input type="file" id="import-backup-input" accept=".json" class="hidden">
+        </label>
+
+        <button id="account-btn" title="Cuenta" class="btn-glass p-2 rounded-xl transition-all text-xs font-medium flex items-center gap-1.5">
+          <i data-lucide="user-cog" class="w-4 h-4" style="color: var(--primary);"></i>
+        </button>
+
+        <!-- Mobile Menu Hamburger Button -->
+        <button id="mobile-menu-btn" class="btn-glass hidden p-2 rounded-xl">
+          <i data-lucide="menu" class="w-5 h-5" style="color: var(--text-main);"></i>
+        </button>
+      </div>
+
+    </div>
+
+  </header>
+
+  <!-- Main View Render Target Container -->
+  <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <!-- Component views are rendered dynamically here -->
+  </main>
+
+  <!-- Footer -->
+  <footer class="max-w-7xl mx-auto px-4 py-6 text-center text-xs pb-safe" style="border-top: 1px solid var(--border-color); color: var(--text-muted);">
+    <p>OP &copy; 2026. Sistema de Gestión de Ventas, Créditos y Cartera.</p>
+  </footer>
+
+
+  <!-- Bottom tab bar (mobile app navigation) -->
+  <nav id="bottom-nav" aria-label="Navegación principal">
+    <button data-tab-target="dashboard" aria-label="Panel" title="Panel"><i data-lucide="layout-dashboard"></i><span>Panel</span></button>
+    <button data-tab-target="today" aria-label="Cobros de hoy" title="Cobros de hoy"><i data-lucide="calendar-clock"></i><span>Cobros</span></button>
+    <button data-tab-target="sales" aria-label="Ventas y abonos" title="Ventas y abonos"><i data-lucide="receipt"></i><span>Ventas</span></button>
+    <button data-tab-target="clients" aria-label="Clientes" title="Clientes"><i data-lucide="users"></i><span>Clientes</span></button>
+    <button data-tab-target="portfolio" aria-label="Cartera" title="Cartera"><i data-lucide="shield-alert"></i><span>Cartera</span></button>
+    <button data-tab-target="quotes" aria-label="Cotizaciones" title="Cotizaciones"><i data-lucide="file-text"></i><span>Cotizar</span></button>
+    <button data-tab-target="products" aria-label="Productos" title="Productos"><i data-lucide="tag"></i><span>Productos</span></button>
+  </nav>
+
+  </div><!-- /#app-shell -->
+
+  <!-- Account Modal: view current user, logout, create new users -->
+  <div id="account-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center px-4 modal-overlay">
+    <div class="w-full max-w-md mx-auto glass-panel p-6 space-y-5 max-h-[85vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold" style="color: var(--text-main);">Cuenta</h2>
+        <button id="account-modal-close" class="btn-glass p-1.5 rounded-lg">
+          <i data-lucide="x" class="w-4 h-4" style="color: var(--text-main);"></i>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-3 p-3 rounded-xl" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style="background: var(--primary-gradient); color: var(--text-on-primary);">
+          <i data-lucide="user" class="w-5 h-5"></i>
+        </div>
+        <div class="min-w-0">
+          <p class="text-[11px] uppercase tracking-wider font-bold" style="color: var(--text-muted);">Sesión activa</p>
+          <p id="account-current-username" class="text-sm font-bold truncate" style="color: var(--text-main);">—</p>
+        </div>
+      </div>
+
+      <button id="enable-push-btn" class="btn-glass w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+        <i data-lucide="bell-ring" class="w-4 h-4" style="color: var(--primary);"></i> Activar notificaciones de cobro
+      </button>
+
+      <div class="grid grid-cols-2 gap-2">
+        <button id="push-test-btn" type="button" class="btn-glass py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+          <i data-lucide="send" class="w-4 h-4" style="color: var(--primary);"></i> Enviar prueba
+        </button>
+        <button id="push-due-btn" type="button" class="btn-glass py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+          <i data-lucide="calendar-clock" class="w-4 h-4" style="color: var(--primary);"></i> Resumen de hoy
+        </button>
+      </div>
+      <button id="push-diag-btn" type="button" class="btn-glass w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+        <i data-lucide="stethoscope" class="w-4 h-4" style="color: var(--primary);"></i> Diagnóstico de notificaciones
+      </button>
+      <pre id="push-diag" class="hidden text-[11px] leading-relaxed p-3 rounded-xl whitespace-pre-wrap break-words" style="background: var(--bg-card-hover); border: 1px solid var(--border-color); color: var(--text-muted);"></pre>
+
+      <div id="mobile-backup" class="md:hidden grid grid-cols-2 gap-2">
+        <button id="acc-export" type="button" class="btn-glass py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+          <i data-lucide="download" class="w-4 h-4" style="color: var(--primary);"></i> Copia
+        </button>
+        <button id="acc-import" type="button" class="btn-glass py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+          <i data-lucide="upload" class="w-4 h-4" style="color: var(--primary);"></i> Restaurar
+        </button>
+      </div>
+      <button id="change-pass-toggle" type="button" class="btn-glass w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+        <i data-lucide="key-round" class="w-4 h-4" style="color: var(--primary);"></i> Cambiar contraseña
+      </button>
+      <form id="change-pass-form" class="hidden space-y-3 p-3 rounded-xl" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
+        <input id="cp-current" type="password" autocomplete="current-password" required placeholder="Contraseña actual" class="input-field w-full px-3 py-2 text-sm">
+        <input id="cp-new" type="password" autocomplete="new-password" required minlength="8" placeholder="Nueva contraseña (mín. 8 caracteres)" class="input-field w-full px-3 py-2 text-sm">
+        <input id="cp-confirm" type="password" autocomplete="new-password" required minlength="8" placeholder="Repite la nueva contraseña" class="input-field w-full px-3 py-2 text-sm">
+        <p id="cp-msg" class="hidden text-xs font-semibold"></p>
+        <button type="submit" class="btn-primary w-full py-2.5 rounded-xl text-sm font-bold">Guardar contraseña</button>
+      </form>      <button id="logout-btn" class="w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2" style="background: var(--danger-bg); color: var(--danger);">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Cerrar sesión
+      </button>
+
+      <div id="user-admin-section" class="hidden pt-2 space-y-4" style="border-top: 1px solid var(--border-color);"></div>
+    </div>
+  </div>
+
+  <!-- App Entry Controller Script -->
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

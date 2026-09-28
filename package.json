@@ -1,0 +1,17 @@
+{
+  "name": "op-admin",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "OP - Sistema de Ventas, Crédito y Gestión de Cartera",
+  "scripts": {
+    "serve": "node server.js",
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "firebase-admin": "^14.4.0"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}
