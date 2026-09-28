@@ -4,12 +4,12 @@
  * identically in light and dark themes.
  */
 
-const C = { ink: '#0b1220', muted: '#5b6b7f', line: '#e2e8f0', soft: '#f1f5f9', accent: '#9333ea', accentSoft: '#f5edff', accentLine: '#e0c4fb', ok: '#059669', okSoft: '#ecfdf5', warn: '#d97706', black: '#0a0612' };
+const C = { ink: '#0b1220', muted: '#5b6b7f', line: '#e2e8f0', soft: '#f1f5f9', accent: '#16a34a', accentSoft: '#ecfdf5', accentLine: '#bbf7d0', ok: '#059669', okSoft: '#ecfdf5', warn: '#d97706', black: '#000000' };
 
 const LOGO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs>' +
-  '<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="70" y1="180" x2="442" y2="332"><stop offset="0" stop-color="#c084fc"/><stop offset=".55" stop-color="#a855f7"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs>' +
-  '<rect width="512" height="512" rx="120" fill="#0a0612"/>' +
+  '<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="70" y1="180" x2="442" y2="332"><stop offset="0" stop-color="#86efac"/><stop offset=".55" stop-color="#4ade80"/><stop offset="1" stop-color="#16a34a"/></linearGradient></defs>' +
+  '<rect width="512" height="512" rx="120" fill="#000000"/>' +
   '<text x="256" y="330" font-family="Arial,sans-serif" font-weight="800" font-size="220" text-anchor="middle" fill="url(#g)">OP</text></svg>'
 );
 
@@ -33,11 +33,11 @@ export function paper({ title, number, date, body, footer = '' }) {
         </div>
       </div>
       <div style="text-align:right;">
-        <div style="font-family:'Courier New',monospace;font-size:15px;font-weight:700;color:#c084fc;">${esc(number)}</div>
+        <div style="font-family:'Courier New',monospace;font-size:15px;font-weight:700;color:#4ade80;">${esc(number)}</div>
         <div style="font-size:11px;color:#cbd5e1;margin-top:2px;">${esc(date)}</div>
       </div>
     </div>
-    <div style="height:4px;background:linear-gradient(90deg,#9333ea,#f59e0b);"></div>
+    <div style="height:4px;background:linear-gradient(90deg,#16a34a,#4ade80);"></div>
     <div style="padding:24px 28px;display:flex;flex-direction:column;gap:16px;font-size:12px;">${body}</div>
     <div style="padding:14px 28px 20px;border-top:1px solid ${C.line};display:flex;justify-content:space-between;align-items:flex-end;font-size:10px;color:${C.muted};">
       <div>${footer}</div>

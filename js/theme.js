@@ -14,7 +14,7 @@ function getPreferredTheme() {
 
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  const color = theme === 'dark' ? '#000000' : '#f0f9ff';
+  const color = theme === 'dark' ? '#000000' : '#ffffff';
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', color);
   updateToggleIcon(theme);
