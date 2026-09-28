@@ -10,8 +10,8 @@
  * real protection comes from Row Level Security policies on the database
  * (see supabase/schema.sql). NEVER put the "service_role" key here.
  */
-export const SUPABASE_URL = '';
-export const SUPABASE_ANON_KEY = '';
+export const SUPABASE_URL = 'https://rrcymxvenlgibitivhiz.supabase.co';
+export const SUPABASE_ANON_KEY = 'sb_publishable_SupS25GaBie9lrRql-IUuA_ft6VBzMZ';
 
 // Firebase (push notifications) — your own Firebase project for OP. These
 // web keys are public by design.
