@@ -5,3 +5,4 @@ www
 supabase
 .github
 *.apk
+server.js
