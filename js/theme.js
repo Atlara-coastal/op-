@@ -49,6 +49,8 @@ const TENANT_LOGOS = { green: './icons/icon.svg', pink: './icons/icon-pink.svg' 
 export function applyTenantTheme(tenant) {
   const theme = TENANT_LOGOS[tenant?.theme] ? tenant.theme : 'green';
   document.documentElement.dataset.tenantTheme = theme;
+  // Remembered so the next launch paints this space's colors from the first frame.
+  try { localStorage.setItem('op_tenant_theme', theme); } catch {}
   document.querySelectorAll('[data-brand-logo]').forEach((img) => { img.src = TENANT_LOGOS[theme]; });
   const sub = document.getElementById('brand-subtitle');
   if (sub && tenant?.name) sub.textContent = tenant.name;

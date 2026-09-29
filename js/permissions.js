@@ -78,11 +78,23 @@ export const getTenants = () => tenants;
 export const getActiveTenant = () => activeTenant;
 export const getActiveTenantInfo = () => tenants.find((t) => t.id === activeTenant) || null;
 
-// Superadmin only: switch space. Reloads so every view and the local cache restart clean.
+// Superadmin only: switch space. Reloads so every view and the local cache restart
+// clean; the boot loader (in the target space's colors) covers the transition.
 export function setActiveTenant(id) {
-  if (!isSuperadmin() || !tenants.some((t) => t.id === id)) return;
-  try { localStorage.setItem(ACTIVE_TENANT_KEY, id); } catch {}
-  window.location.reload();
+  const target = tenants.find((t) => t.id === id);
+  if (!isSuperadmin() || !target) return;
+  const html = document.documentElement;
+  try {
+    localStorage.setItem(ACTIVE_TENANT_KEY, id);
+    localStorage.setItem('op_tenant_theme', target.theme || 'green');
+    sessionStorage.setItem('op_boot_msg', `Cambiando a ${target.name}…`);
+  } catch {}
+  const text = document.getElementById('boot-loader-text');
+  if (text) text.textContent = `Cambiando a ${target.name}…`;
+  html.dataset.tenantTheme = target.theme || 'green';
+  html.classList.add('restoring-session');
+  document.getElementById('account-modal')?.classList.add('hidden');
+  setTimeout(() => window.location.reload(), 450);
 }
 
 export function level(tab) {

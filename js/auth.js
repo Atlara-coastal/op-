@@ -9,7 +9,7 @@
  */
 import { supabase, isSupabaseConfigured } from './supabase-client.js';
 import { AUTH_USERNAME_DOMAIN } from './config.js';
-import { animateModalIn, animateLoginIn } from './animations.js';
+import { animateModalIn, animateLoginIn, animateShellIn } from './animations.js';
 import { loadProfile, hasAnyAccess, getActiveTenant, getActiveTenantInfo, isSuperadmin, getTenants, setActiveTenant } from './permissions.js';
 import { initUsersAdmin } from './users.js';
 import { db } from './db.js';
@@ -38,7 +38,19 @@ function showAppShell(show) {
   const appShell = document.getElementById('app-shell');
   if (loginScreen) loginScreen.classList.toggle('hidden', show);
   if (appShell) appShell.classList.toggle('hidden', !show);
-  if (!show) animateLoginIn();
+  hideBootLoader(show);
+  if (show) animateShellIn();
+  else animateLoginIn();
+}
+
+// The boot loader (see index.html) covers the page while a saved session is restored.
+function hideBootLoader(fade) {
+  const html = document.documentElement;
+  if (!html.classList.contains('restoring-session')) return;
+  const loader = document.getElementById('boot-loader');
+  if (!fade || !loader) { html.classList.remove('restoring-session'); return; }
+  loader.classList.add('bl-out');
+  setTimeout(() => { html.classList.remove('restoring-session'); loader.classList.remove('bl-out'); }, 350);
 }
 
 export function getCurrentUsername() {
@@ -117,6 +129,7 @@ function bindLogout() {
   btn.addEventListener('click', async () => {
     await supabase.auth.signOut();
     currentSession = null;
+    try { localStorage.removeItem('op_tenant_theme'); } catch {}
     window.location.reload();
   });
 }

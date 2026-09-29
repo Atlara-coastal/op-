@@ -30,6 +30,15 @@ export function animateModalIn(modalEl) {
   }
 }
 
+// App shell entrance after login / session restore: header drops in, mobile tab bar rises.
+export function animateShellIn() {
+  if (!window.gsap || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const header = document.querySelector('#app-shell header');
+  const bottomNav = document.getElementById('bottom-nav');
+  if (header) window.gsap.fromTo(header, { opacity: 0, y: -14 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out', clearProps: 'transform,opacity' });
+  if (bottomNav) window.gsap.fromTo(bottomNav, { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, delay: 0.1, ease: 'power2.out', clearProps: 'transform,opacity' });
+}
+
 export function animateLoginIn() {
   if (!window.gsap) return;
   const form = document.getElementById('login-form');

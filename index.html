@@ -19,6 +19,18 @@
         document.documentElement.setAttribute('data-theme', 'light');
       }
     })();
+    // A saved Supabase session means the user is already logged in: show the boot
+    // loader (not the login form) while it's restored, already in the colors of the
+    // space used last time, so nothing flashes on open or after switching spaces.
+    (function () {
+      try {
+        var hasSession = Object.keys(localStorage).some(function (k) { return /^sb-.+-auth-token$/.test(k); });
+        if (!hasSession) return;
+        document.documentElement.classList.add('restoring-session');
+        var t = localStorage.getItem('op_tenant_theme');
+        if (t) document.documentElement.setAttribute('data-tenant-theme', t);
+      } catch (e) { /* storage blocked: normal login flow */ }
+    })();
   </script>
 
   <!-- Google Fonts -->
@@ -99,6 +111,21 @@
         sessionStorage.setItem('jocoSplash', '1');
       } catch (e) { /* storage blocked: still show once */ }
       setTimeout(done, 2600);
+    })();
+  </script>
+
+  <!-- Boot loader: shown instead of the login form while a saved session is restored -->
+  <div id="boot-loader" aria-hidden="true">
+    <div class="bl-logo"></div>
+    <div class="bl-bar"><span></span></div>
+    <p id="boot-loader-text">Cargando…</p>
+  </div>
+  <script>
+    (function () {
+      try {
+        var msg = sessionStorage.getItem('op_boot_msg');
+        if (msg) { document.getElementById('boot-loader-text').textContent = msg; sessionStorage.removeItem('op_boot_msg'); }
+      } catch (e) { /* ignore */ }
     })();
   </script>
 
