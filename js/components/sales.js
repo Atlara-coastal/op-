@@ -1030,7 +1030,7 @@ window.salesModule = {
     // Excel) so it shows up in receipts/history like any other abono. Keep that record
     // in sync when "Cuota inicial" is edited here, otherwise the balance below would
     // silently ignore the new value.
-    const initialPay = payments.find(p => p.id.endsWith('-i') || /^(Cuota inicial|Pago de contado) \(importado\)$/.test(p.notes || ''));
+    const initialPay = payments.find(p => p.id.endsWith('-i') || /^\s*(cuota inicial|pago de contado)/i.test(p.notes || ''));
     if (initialPay && newInitial <= 0) {
       db.deleteItem('payments', initialPay.id);
       payments = payments.filter(p => p.id !== initialPay.id);
