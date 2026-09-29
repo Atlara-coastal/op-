@@ -41,6 +41,7 @@ function allPayments() {
   return db.getCollection('payments').map((p) => {
     const s = sales.find((x) => x.id === p.saleId) || {};
     return {
+      id: p.id,
       date: String(p.date || p.createdAt || '').slice(0, 10),
       amount: parseFloat(p.amount) || 0,
       client: p.clientName || s.clientName || '',
@@ -133,12 +134,12 @@ export function renderCollections(container) {
           </div>
         </div>
         <div class="glass-panel overflow-hidden">
-          <div class="p-4 text-sm font-bold" style="border-bottom: 1px solid var(--border-color); color: var(--text-main);">Detalle de pagos ${rangeList.length > 300 ? '(últimos 300)' : ''}</div>
+          <div class="p-4 text-sm font-bold" style="border-bottom: 1px solid var(--border-color); color: var(--text-main);">Detalle de pagos ${rangeList.length > 300 ? '(últimos 300)' : ''} <span class="font-normal text-[10px]" style="color: var(--text-muted);">(clic en un pago para revisarlo/editarlo)</span></div>
           <div class="overflow-auto max-h-96">
             <table class="w-full text-xs text-left" style="color: var(--text-muted);">
               <thead style="background: var(--bg-card-hover);"><tr><th class="p-3">Fecha</th><th class="p-3">Cliente</th><th class="p-3">Vendedor</th><th class="p-3">Método</th><th class="p-3 text-right">Valor</th></tr></thead>
               <tbody class="divide-y" style="border-color: var(--border-color);">
-                ${detail.length ? detail.map((p) => `<tr><td class="p-3 whitespace-nowrap">${formatDate(p.date + 'T12:00:00')}</td><td class="p-3"><div class="font-semibold" style="color: var(--text-main);">${p.client}</div><div class="text-[10px]">${p.sale}</div></td><td class="p-3">${p.seller}</td><td class="p-3">${p.method}</td><td class="p-3 text-right font-mono font-bold" style="color: var(--success);">${formatCurrency(p.amount)}</td></tr>`).join('') : '<tr><td colspan="5" class="p-6 text-center">Sin pagos en este período.</td></tr>'}
+                ${detail.length ? detail.map((p) => `<tr onclick="window.salesModule.openEditPayment('${p.id}')" class="cursor-pointer transition-colors" onmouseover="this.style.background='var(--bg-card-hover)'" onmouseout="this.style.background='transparent'"><td class="p-3 whitespace-nowrap">${formatDate(p.date + 'T12:00:00')}</td><td class="p-3"><div class="font-semibold" style="color: var(--text-main);">${p.client}</div><div class="text-[10px]">${p.sale}</div></td><td class="p-3">${p.seller}</td><td class="p-3">${p.method}</td><td class="p-3 text-right font-mono font-bold" style="color: var(--success);">${formatCurrency(p.amount)}</td></tr>`).join('') : '<tr><td colspan="5" class="p-6 text-center">Sin pagos en este período.</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -180,5 +181,6 @@ const rerender = () => {
 window.collectionsModule = {
   setGroup(g) { state.group = g; defaults(g, bogotaToday()); rerender(); },
   setRange(which, v) { if (v) { state[which] = v; rerender(); } },
-  setSeller(s) { state.seller = s; rerender(); }
+  setSeller(s) { state.seller = s; rerender(); },
+  refresh: rerender
 };

@@ -754,6 +754,7 @@ window.salesModule = {
 
     this.closePaymentModal();
     renderSales(document.getElementById('main-content'));
+    window.collectionsModule?.refresh?.();
     this.openReceiptModal(newPayment.id);
   },
 
@@ -1014,9 +1015,40 @@ window.salesModule = {
     const v = (id) => document.getElementById(id)?.value ?? '';
     const n = (id) => parseFloat(v(id)) || 0;
     const client = db.getCollection('clients').find(c => c.id === v('es-client'));
-    const payments = db.getCollection('payments').filter(p => p.saleId === saleId);
-    const totalPaid = payments.reduce((a, p) => a + (parseFloat(p.amount) || 0), 0);
+    let payments = db.getCollection('payments').filter(p => p.saleId === saleId);
     const total = n('es-total');
+    const newInitial = n('es-initial');
+
+    // The down payment made at sale time is ALSO stored as its own payment record
+    // (id ending in "-i", see saveSale) so it shows up in receipts/history like any
+    // other abono. Keep that record in sync when "Cuota inicial" is edited here,
+    // otherwise the balance below would silently ignore the new value.
+    const initialPay = payments.find(p => p.id.endsWith('-i'));
+    if (initialPay && newInitial <= 0) {
+      db.deleteItem('payments', initialPay.id);
+      payments = payments.filter(p => p.id !== initialPay.id);
+    } else if (initialPay && (parseFloat(initialPay.amount) || 0) !== newInitial) {
+      db.updateItem('payments', initialPay.id, { amount: newInitial });
+      initialPay.amount = newInitial;
+    } else if (!initialPay && newInitial > 0) {
+      const newPay = {
+        id: 'pay-' + Date.now() + '-i',
+        receiptNumber: 'REC-' + Math.floor(1000 + Math.random() * 9000),
+        saleId, saleNumber: s.saleNumber,
+        clientId: client?.id || s.clientId, clientName: client?.fullName || s.clientName,
+        amount: newInitial,
+        previousBalance: total,
+        newBalance: Math.max(0, total - newInitial),
+        paymentMethod: 'Efectivo',
+        date: v('es-date') || s.date,
+        notes: 'Cuota inicial',
+        createdAt: new Date().toISOString()
+      };
+      db.addItem('payments', newPay);
+      payments.push(newPay);
+    }
+
+    const totalPaid = payments.reduce((a, p) => a + (parseFloat(p.amount) || 0), 0);
     const days = v('es-days').split(/[,\s]+/).map(Number).filter(d => d >= 1 && d <= 31);
     const balance = Math.max(0, total - totalPaid);
     const patch = {
@@ -1028,7 +1060,7 @@ window.salesModule = {
       type: v('es-type'),
       frequency: v('es-freq'),
       totalAmount: total,
-      initialPayment: n('es-initial'),
+      initialPayment: newInitial,
       installmentsCount: Math.max(1, Math.round(n('es-count')) || 1),
       installmentAmount: n('es-inst'),
       startDate: v('es-start') || null,
@@ -1046,6 +1078,7 @@ window.salesModule = {
     closeEditModal();
     showToast('Venta actualizada', 'success');
     renderSales(document.getElementById('main-content'));
+    window.collectionsModule?.refresh?.();
   },
 
   deleteSale(saleId) {
@@ -1127,5 +1160,6 @@ function afterPaymentChange(saleId) {
   closeEditModal();
   renderSales(document.getElementById('main-content'));
   window.salesModule.openPaymentHistoryModal(saleId);
+  window.collectionsModule?.refresh?.();
 }
 
