@@ -160,30 +160,30 @@
         </div>
       </div>
 
-      <!-- Desktop Navigation Links: scrolls horizontally instead of squeezing the
-           utility buttons on the right off-screen when the window is too narrow
-           to fit every label. -->
-      <nav class="hidden md:flex items-center gap-1 p-1.5 rounded-2xl min-w-0 overflow-x-auto no-scrollbar" style="background: var(--bg-card); border: 1px solid var(--border-color);">
-        <button data-tab-target="dashboard" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0">
-          <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Panel
+      <!-- Desktop Navigation Links. On narrower desktop widths only the active tab
+           keeps its label (the rest are icon + tooltip, see .top-nav in styles.css);
+           horizontal scroll stays as a last-resort fallback. -->
+      <nav class="top-nav hidden md:flex items-center gap-1 p-1.5 rounded-2xl min-w-0 overflow-x-auto no-scrollbar" style="background: var(--bg-card); border: 1px solid var(--border-color);">
+        <button data-tab-target="dashboard" title="Panel" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0 whitespace-nowrap">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i><span class="nav-label">Panel</span>
         </button>
-        <button data-tab-target="products" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0">
-          <i data-lucide="tag" class="w-4 h-4"></i> Productos
+        <button data-tab-target="products" title="Productos" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0 whitespace-nowrap">
+          <i data-lucide="tag" class="w-4 h-4"></i><span class="nav-label">Productos</span>
         </button>
-        <button data-tab-target="quotes" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0">
-          <i data-lucide="file-text" class="w-4 h-4"></i> Cotizaciones
+        <button data-tab-target="quotes" title="Cotizaciones" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0 whitespace-nowrap">
+          <i data-lucide="file-text" class="w-4 h-4"></i><span class="nav-label">Cotizaciones</span>
         </button>
-        <button data-tab-target="clients" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0">
-          <i data-lucide="users" class="w-4 h-4"></i> Clientes (CC)
+        <button data-tab-target="clients" title="Clientes (CC)" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0 whitespace-nowrap">
+          <i data-lucide="users" class="w-4 h-4"></i><span class="nav-label">Clientes (CC)</span>
         </button>
-        <button data-tab-target="sales" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0">
-          <i data-lucide="receipt" class="w-4 h-4"></i> Ventas & Abonos
+        <button data-tab-target="sales" title="Ventas & Abonos" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0 whitespace-nowrap">
+          <i data-lucide="receipt" class="w-4 h-4"></i><span class="nav-label">Ventas & Abonos</span>
         </button>
-        <button data-tab-target="portfolio" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0">
-          <i data-lucide="shield-alert" class="w-4 h-4"></i> Cartera
+        <button data-tab-target="portfolio" title="Cartera" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0 whitespace-nowrap">
+          <i data-lucide="shield-alert" class="w-4 h-4"></i><span class="nav-label">Cartera</span>
         </button>
-        <button data-tab-target="today" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0">
-          <i data-lucide="calendar-clock" class="w-4 h-4"></i> Cobros hoy
+        <button data-tab-target="today" title="Cobros hoy" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all flex-shrink-0 whitespace-nowrap">
+          <i data-lucide="calendar-clock" class="w-4 h-4"></i><span class="nav-label">Cobros hoy</span>
         </button>
       </nav>
 
@@ -199,11 +199,11 @@
         </button>
 
         <button id="export-backup-btn" title="Descargar copia de seguridad JSON" class="btn-glass hidden md:flex p-2 rounded-xl transition-all text-xs font-medium flex items-center gap-1.5">
-          <i data-lucide="download" class="w-4 h-4" style="color: var(--primary);"></i> <span class="hidden lg:inline">Backup</span>
+          <i data-lucide="download" class="w-4 h-4" style="color: var(--primary);"></i> <span class="hidden 2xl:inline">Backup</span>
         </button>
 
         <label title="Restaurar copia de seguridad" class="btn-glass hidden md:flex p-2 rounded-xl transition-all text-xs font-medium flex items-center gap-1.5 cursor-pointer">
-          <i data-lucide="upload" class="w-4 h-4" style="color: var(--primary);"></i> <span class="hidden lg:inline">Restaurar</span>
+          <i data-lucide="upload" class="w-4 h-4" style="color: var(--primary);"></i> <span class="hidden 2xl:inline">Restaurar</span>
           <input type="file" id="import-backup-input" accept=".json" class="hidden">
         </label>
 

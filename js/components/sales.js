@@ -6,7 +6,7 @@
 import { db } from '../db.js';
 import { getSellers, getMyUsername } from '../permissions.js';
 import { paper, docBox, esc, fitPaper, exportPdfById } from '../pdf-doc.js';
-import { effectiveStatus, installmentValue, nextDue } from '../due.js';
+import { effectiveStatus, installmentValue, nextDue, bogotaToday } from '../due.js';
 import { formatCurrency, formatDate, repriceItems, showToast, generateWhatsAppPaymentReceipt } from '../utils.js';
 
 let newSaleItems = [];
@@ -402,7 +402,7 @@ window.salesModule = {
     document.getElementById('sale-form').reset();
     
     // Set default payment start date (today)
-    document.getElementById('sale-start-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('sale-start-date').value = bogotaToday();
 
     if (prefilledQuote) {
       document.getElementById('sale-installments').value = prefilledQuote.installmentsCount || 4;
@@ -613,7 +613,7 @@ window.salesModule = {
     const customCuota = parseFloat(document.getElementById('sale-inst-amount')?.value) || 0;
     const totalPaid = initial;
     const outstandingBalance = Math.max(0, totalAmount - totalPaid);
-    const today = new Date().toISOString().split('T')[0];
+    const today = bogotaToday();
     const saleId = 'sale-' + Date.now();
     const saleNumber = 'VTA-' + Math.floor(100 + Math.random() * 900);
 
@@ -662,7 +662,7 @@ window.salesModule = {
   // Payment Abono Module Handlers
   openPaymentModal() {
     document.getElementById('payment-form').reset();
-    document.getElementById('pay-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('pay-date').value = bogotaToday();
     document.getElementById('payment-debt-summary').classList.add('hidden');
     document.getElementById('payment-modal').classList.remove('hidden');
     if (window.lucide) window.lucide.createIcons();

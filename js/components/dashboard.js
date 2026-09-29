@@ -94,8 +94,8 @@ export function renderDashboard(container) {
     <div class="space-y-6 animate-fade-in">
 
       <!-- Top Banner / Hero -->
-      <div class="glass-panel p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div class="relative z-10 space-y-2 max-w-2xl">
+      <div class="glass-panel p-6 sm:p-8 relative overflow-hidden flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">
+        <div class="relative z-10 space-y-2 max-w-2xl min-w-0">
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold" style="background: var(--primary-container); color: var(--primary); border: 1px solid var(--border-color);">
             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Gestión de Ventas & Cartera en Tiempo Real
           </div>
@@ -105,11 +105,11 @@ export function renderDashboard(container) {
           </p>
         </div>
 
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 relative z-10 w-full md:w-auto">
-          <button onclick="window.app.switchTab('sales', 'new-sale')" class="btn-primary sm:flex-1 md:flex-none px-5 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 relative z-10 w-full xl:w-auto flex-shrink-0">
+          <button onclick="window.app.switchTab('sales', 'new-sale')" class="btn-primary sm:flex-1 xl:flex-none whitespace-nowrap px-5 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2">
             <i data-lucide="plus-circle" class="w-4 h-4"></i> Nueva Venta / Crédito
           </button>
-          <button onclick="window.app.switchTab('sales', 'new-payment')" class="btn-glass sm:flex-1 md:flex-none px-5 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2">
+          <button onclick="window.app.switchTab('sales', 'new-payment')" class="btn-glass sm:flex-1 xl:flex-none whitespace-nowrap px-5 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2">
             <i data-lucide="dollar-sign" class="w-4 h-4"></i> Registrar Abono
           </button>
         </div>

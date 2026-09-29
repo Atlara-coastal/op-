@@ -7,7 +7,10 @@ import { addDays, addMonths, bogotaToday } from '../due.js';
 import { formatCurrency, formatDate } from '../utils.js';
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-const state = { group: 'day', from: '', to: '', seller: 'all' };
+// custom = the user picked the dates by hand; otherwise the range is recomputed on
+// every render so it follows "today" (an app left open past midnight would otherwise
+// keep yesterday as the end date and hide today's payments).
+const state = { group: 'day', from: '', to: '', seller: 'all', custom: false };
 let chart = null;
 
 const dow = (iso) => (new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7; // Monday = 0
@@ -56,7 +59,7 @@ const sum = (list) => list.reduce((a, p) => a + p.amount, 0);
 
 export function renderCollections(container) {
   const today = bogotaToday();
-  if (!state.from) defaults(state.group, today);
+  if (!state.custom) defaults(state.group, today);
   const payments = allPayments();
   const sellers = [...new Set(payments.map((p) => p.seller))].sort();
   const scoped = state.seller === 'all' ? payments : payments.filter((p) => p.seller === state.seller);
@@ -179,8 +182,8 @@ const rerender = () => {
 };
 
 window.collectionsModule = {
-  setGroup(g) { state.group = g; defaults(g, bogotaToday()); rerender(); },
-  setRange(which, v) { if (v) { state[which] = v; rerender(); } },
+  setGroup(g) { state.group = g; state.custom = false; defaults(g, bogotaToday()); rerender(); },
+  setRange(which, v) { if (v) { state[which] = v; state.custom = true; rerender(); } },
   setSeller(s) { state.seller = s; rerender(); },
   refresh: rerender
 };
