@@ -9,12 +9,54 @@
 const enhanced = new WeakSet();
 const valueDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
 let openState = null;
+let menuIdSeq = 0;
 
 function closeMenu() {
   if (!openState) return;
   openState.menu.remove();
   openState.btn.setAttribute('aria-expanded', 'false');
+  openState.btn.removeAttribute('aria-activedescendant');
   openState = null;
+}
+
+// Keyboard support for the floating listbox: the button keeps DOM focus and
+// drives a highlighted option via aria-activedescendant (standard combobox
+// pattern), so arrow keys work without moving focus into the menu itself.
+function setHighlight(idx) {
+  if (!openState) return;
+  openState.items.forEach((it, i) => it.el.classList.toggle('highlighted', i === idx));
+  openState.highlighted = idx;
+  if (idx >= 0) {
+    const el = openState.items[idx].el;
+    el.scrollIntoView({ block: 'nearest' });
+    openState.btn.setAttribute('aria-activedescendant', el.id);
+  } else {
+    openState.btn.removeAttribute('aria-activedescendant');
+  }
+}
+
+function moveHighlight(delta) {
+  if (!openState) return;
+  const items = openState.items;
+  const enabled = items.map((_, i) => i).filter((i) => !items[i].disabled);
+  if (!enabled.length) return;
+  const pos = enabled.indexOf(openState.highlighted);
+  const next = pos === -1 ? (delta > 0 ? 0 : enabled.length - 1) : (pos + delta + enabled.length) % enabled.length;
+  setHighlight(enabled[next]);
+}
+
+function highlightEdge(dir) {
+  if (!openState) return;
+  const items = openState.items;
+  const enabled = items.map((_, i) => i).filter((i) => !items[i].disabled);
+  if (!enabled.length) return;
+  setHighlight(dir === 'first' ? enabled[0] : enabled[enabled.length - 1]);
+}
+
+function selectHighlighted() {
+  if (!openState || openState.highlighted < 0) return;
+  const it = openState.items[openState.highlighted];
+  if (!it.disabled) it.selectFn();
 }
 
 function openMenu(select, btn, sync) {
@@ -22,24 +64,33 @@ function openMenu(select, btn, sync) {
   const menu = document.createElement('div');
   menu.className = 'cs-menu';
   menu.setAttribute('role', 'listbox');
+  const menuId = 'cs-menu-' + (++menuIdSeq);
+  menu.id = menuId;
 
+  const items = [];
   Array.from(select.options).forEach((opt) => {
     if (opt.hidden) return;
+    const idx = items.length;
     const item = document.createElement('div');
     item.className = 'cs-opt' + (opt.selected ? ' selected' : '') + (opt.disabled ? ' disabled' : '');
+    item.id = menuId + '-opt-' + idx;
     item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', String(!!opt.selected));
     item.textContent = opt.textContent;
+    const selectFn = () => {
+      valueDesc.set.call(select, opt.value);
+      sync();
+      select.dispatchEvent(new Event('input', { bubbles: true }));
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      closeMenu();
+      btn.focus();
+    };
     if (!opt.disabled) {
-      item.addEventListener('click', () => {
-        valueDesc.set.call(select, opt.value);
-        sync();
-        select.dispatchEvent(new Event('input', { bubbles: true }));
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-        closeMenu();
-        btn.focus();
-      });
+      item.addEventListener('click', selectFn);
+      item.addEventListener('mouseenter', () => setHighlight(idx));
     }
     menu.appendChild(item);
+    items.push({ el: item, disabled: opt.disabled, selected: opt.selected, selectFn });
   });
 
   document.body.appendChild(menu);
@@ -52,10 +103,13 @@ function openMenu(select, btn, sync) {
   menu.style.maxHeight = `${Math.max(120, Math.min(280, (openUp ? r.top : spaceBelow) - 12))}px`;
   if (openUp) menu.style.bottom = `${window.innerHeight - r.top + 6}px`;
   else menu.style.top = `${r.bottom + 6}px`;
-  menu.querySelector('.selected')?.scrollIntoView({ block: 'nearest' });
 
   btn.setAttribute('aria-expanded', 'true');
-  openState = { menu, btn };
+  btn.setAttribute('aria-controls', menuId);
+  openState = { menu, btn, items, highlighted: -1 };
+
+  const selIdx = items.findIndex((it) => it.selected);
+  setHighlight(selIdx >= 0 ? selIdx : items.findIndex((it) => !it.disabled));
 }
 
 function enhance(select) {
@@ -103,7 +157,33 @@ function enhance(select) {
     else openMenu(select, btn, sync);
   });
   btn.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeMenu();
+    const isOpen = openState?.btn === btn;
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        if (!isOpen) openMenu(select, btn, sync); else moveHighlight(1);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (!isOpen) openMenu(select, btn, sync); else moveHighlight(-1);
+        break;
+      case 'Home':
+        if (isOpen) { e.preventDefault(); highlightEdge('first'); }
+        break;
+      case 'End':
+        if (isOpen) { e.preventDefault(); highlightEdge('last'); }
+        break;
+      case 'Enter':
+      case ' ':
+        if (isOpen) { e.preventDefault(); selectHighlighted(); }
+        break;
+      case 'Escape':
+        if (isOpen) { e.preventDefault(); closeMenu(); }
+        break;
+      case 'Tab':
+        if (isOpen) closeMenu();
+        break;
+    }
   });
 
   sync();

@@ -239,7 +239,7 @@ export function renderSales(container) {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Monto del Abono ($) *</label>
-              <input type="number" id="pay-amount" required min="1" step="100" placeholder="100000" class="input-field w-full px-3 py-2 text-sm font-mono">
+              <input type="number" id="pay-amount" required min="1" step="any" placeholder="100000" class="input-field w-full px-3 py-2 text-sm font-mono">
             </div>
             <div>
               <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Método de Pago</label>

@@ -381,6 +381,7 @@ select option {
 .cs-opt.selected { color: var(--primary); font-weight: 700; background: var(--primary-container); }
 .cs-opt.selected::after { content: '\2713'; font-size: 12px; }
 .cs-opt.disabled { opacity: 0.4; cursor: not-allowed; }
+.cs-opt.highlighted { background: var(--bg-card-hover); box-shadow: inset 0 0 0 1px var(--primary); }
 
 /* Other native selection controls follow the theme too */
 input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); }

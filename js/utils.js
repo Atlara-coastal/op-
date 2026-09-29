@@ -163,7 +163,10 @@ export function getClientTypeBadgeHtml(type) {
 // Format Date nicely
 export function formatDate(dateString) {
   if (!dateString) return '-';
-  const d = new Date(dateString);
+  // A plain "YYYY-MM-DD" string (from a <input type="date">, e.g.) is parsed by
+  // the Date constructor as UTC midnight, which then displays as the day before
+  // in any timezone behind UTC (like Colombia). Force it to local midnight instead.
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? new Date(dateString + 'T00:00:00') : new Date(dateString);
   return d.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
