@@ -1,15 +1,13 @@
 importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 
-// TODO: fill in with OP's own Firebase project config (must match js/config.js's
-// FIREBASE_CONFIG exactly — this file can't import config.js, so it's duplicated here).
 firebase.initializeApp({
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: ''
+  apiKey: 'AIzaSyACQypHsPbTxx3soo9szT6A1icdUF2loAI',
+  authDomain: 'opgestion-fbea7.firebaseapp.com',
+  projectId: 'opgestion-fbea7',
+  storageBucket: 'opgestion-fbea7.firebasestorage.app',
+  messagingSenderId: '675989086511',
+  appId: '1:675989086511:web:5226c9ff1f923433d6c1da'
 });
 
 const messaging = firebase.messaging();

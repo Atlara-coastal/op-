@@ -16,14 +16,14 @@ export const SUPABASE_ANON_KEY = 'sb_publishable_SupS25GaBie9lrRql-IUuA_ft6VBzMZ
 // Firebase (push notifications) — your own Firebase project for OP. These
 // web keys are public by design.
 export const FIREBASE_CONFIG = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: ''
+  apiKey: 'AIzaSyACQypHsPbTxx3soo9szT6A1icdUF2loAI',
+  authDomain: 'opgestion-fbea7.firebaseapp.com',
+  projectId: 'opgestion-fbea7',
+  storageBucket: 'opgestion-fbea7.firebasestorage.app',
+  messagingSenderId: '675989086511',
+  appId: '1:675989086511:web:5226c9ff1f923433d6c1da'
 };
-export const FIREBASE_VAPID_KEY = '';
+export const FIREBASE_VAPID_KEY = 'BBl1CLuzEy5UqcKN6BmeeFGXOEo8K-FTFDllTXvK3eE7rw7qBam2Rq6WKQ2gou22ycD0NbLtt8xee1WMIbkkKic';
 
 // Internal domain used to turn a plain username into a Supabase Auth email.
 // Do not change this after users have been created, or logins will break.
