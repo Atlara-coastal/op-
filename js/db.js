@@ -367,7 +367,8 @@ class DBManager {
     if (!queue.length) return;
 
     this._flushing = true;
-    const remaining = [];
+    const sent = new Map();
+    const opKey = (o) => o.collection + '|' + o.id;
     try {
       for (const op of queue) {
         try {
@@ -375,13 +376,22 @@ class DBManager {
             ? await supabase.from(op.collection).upsert({ id: op.id, deleted: true, updated_at: new Date().toISOString() })
             : await supabase.from(op.collection).upsert({ id: op.id, data: op.item, updated_at: new Date().toISOString(), deleted: false });
           if (error) throw error;
+          sent.set(opKey(op), JSON.stringify(op));
         } catch (err) {
-          remaining.push(op);
+          // stays in the queue, retried on the next flush
         }
       }
     } finally {
-      this.savePendingQueue(remaining);
+      // Writes made while this flush was awaiting the network (e.g. a payment saved
+      // right after its sale's total was updated) were appended to the stored queue
+      // meanwhile. Re-read it and drop only the ops actually sent in this pass —
+      // overwriting it with this pass's leftovers silently lost those new writes.
+      const current = this.getPendingQueue();
+      const next = current.filter((o) => sent.get(opKey(o)) !== JSON.stringify(o));
+      this.savePendingQueue(next);
       this._flushing = false;
+      const queuedMeanwhile = next.some((o) => !queue.some((q) => opKey(q) === opKey(o) && JSON.stringify(q) === JSON.stringify(o)));
+      if (queuedMeanwhile) this.flushPendingQueue();
     }
   }
 
@@ -400,6 +410,9 @@ class DBManager {
   applyRemoteChange(collection, payload) {
     const items = this.getCollection(collection);
     const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
+    // A local write to this record is still queued: the local copy is newer than
+    // this event (usually the late echo of an earlier save), so don't let it win.
+    if (this.getPendingQueue().some((o) => o.collection === collection && o.id === row.id)) return;
     const isDelete = payload.eventType === 'DELETE' || row.deleted;
     const index = items.findIndex((i) => i.id === row.id);
 

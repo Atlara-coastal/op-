@@ -715,8 +715,12 @@ window.salesModule = {
     const sale = sales.find(s => s.id === saleId);
     if (!sale) return;
 
-    const previousBalance = (parseFloat(sale.totalAmount) || 0) - (parseFloat(sale.totalPaid) || 0);
-    const newTotalPaid = (parseFloat(sale.totalPaid) || 0) + amount;
+    // Derive the paid total from the payment records themselves rather than adding
+    // onto sale.totalPaid: that stored value can be momentarily stale (a realtime echo
+    // of an earlier save arriving late), which made consecutive abonos undercount.
+    const paidBefore = db.getCollection('payments').filter(p => p.saleId === saleId).reduce((a, p) => a + (parseFloat(p.amount) || 0), 0);
+    const previousBalance = Math.max(0, (parseFloat(sale.totalAmount) || 0) - paidBefore);
+    const newTotalPaid = paidBefore + amount;
     const newBalance = Math.max(0, (parseFloat(sale.totalAmount) || 0) - newTotalPaid);
     const newStatus = newBalance === 0 ? 'pagado' : sale.status;
     const receiptNumber = 'REC-' + Math.floor(1000 + Math.random() * 9000);

@@ -7,14 +7,12 @@
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
-/* Desktop top nav: the 7 full labels only fit from ~1440px. Below that, inactive
-   tabs collapse to icon-only (label on hover via title) and only the active tab
-   keeps its name, instead of the row being cut off at the edge. */
-@media (max-width: 1439px) {
-  .top-nav .nav-label { display: none; }
-  .top-nav .nav-btn-active .nav-label { display: inline; }
-  .top-nav button:not(.nav-btn-active) { padding-left: 0.6rem; padding-right: 0.6rem; }
-}
+/* Desktop top nav: the header is capped at max-w-7xl (1280px), where the 7 full
+   labels plus the utility buttons never fit, so inactive tabs are always icon-only
+   (label on hover via title) and only the active tab shows its name. */
+.top-nav .nav-label { display: none; }
+.top-nav .nav-btn-active .nav-label { display: inline; }
+.top-nav button:not(.nav-btn-active) { padding-left: 0.6rem; padding-right: 0.6rem; }
 
 :root,
 :root[data-theme="light"] {
