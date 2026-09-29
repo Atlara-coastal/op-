@@ -188,6 +188,14 @@ h2 { font-size: clamp(1.125rem, 1rem + 0.6vw, 1.375rem); }
   border-radius: var(--radius-md, 0.75rem);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+/* iOS Safari auto-zooms the page when a focused field's font-size is under 16px,
+   which shoves content out past card edges until the user manually zooms back out.
+   Force 16px on touch-width screens; desktop keeps the compact text-sm size. */
+@media (max-width: 640px) {
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"],
+  input[type="tel"], input[type="search"], input[type="date"], input[type="datetime-local"],
+  input:not([type]), select, textarea { font-size: 16px !important; }
+}
 .input-field::placeholder {
   color: var(--text-muted);
   opacity: 0.7;
