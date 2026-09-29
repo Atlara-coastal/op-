@@ -49,15 +49,15 @@ export function renderSales(container) {
           <table class="w-full text-left text-sm" style="color: var(--text-muted);">
             <thead class="text-xs font-semibold uppercase" style="background: var(--bg-card-hover); color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
               <tr>
-                <th class="px-5 py-3.5">N° Venta</th>
-                <th class="px-5 py-3.5">Cliente</th>
-                <th class="px-5 py-3.5">Vendedor</th>
-                <th class="px-5 py-3.5 text-center">Tipo</th>
-                <th class="px-5 py-3.5 text-right">Monto Total</th>
-                <th class="px-5 py-3.5 text-right" style="color: var(--success);">Total Pagado</th>
-                <th class="px-5 py-3.5 text-right font-bold" style="color: var(--warning);">Saldo Restante</th>
-                <th class="px-5 py-3.5 text-center">Estado</th>
-                <th class="px-5 py-3.5 text-center">Acción</th>
+                <th class="px-3 xl:px-5 py-3.5 whitespace-nowrap">N° Venta</th>
+                <th class="px-3 xl:px-5 py-3.5">Cliente</th>
+                <th class="hidden xl:table-cell px-5 py-3.5">Vendedor</th>
+                <th class="hidden xl:table-cell px-5 py-3.5 text-center">Tipo</th>
+                <th class="px-3 xl:px-5 py-3.5 text-right">Monto Total</th>
+                <th class="px-3 xl:px-5 py-3.5 text-right" style="color: var(--success);">Total Pagado</th>
+                <th class="px-3 xl:px-5 py-3.5 text-right font-bold" style="color: var(--warning);">Saldo Restante</th>
+                <th class="px-3 xl:px-5 py-3.5 text-center">Estado</th>
+                <th class="px-3 xl:px-5 py-3.5 text-center">Acción</th>
               </tr>
             </thead>
             <tbody id="sales-table-body" class="divide-y" style="border-color: var(--border-color);">
@@ -345,9 +345,9 @@ function renderSalesTable(searchTerm = '') {
 
   tbody.innerHTML = filtered.map(s => {
     const statusBadges = {
-      'pagado': '<span class="px-2.5 py-1 rounded-full badge-al-dia text-xs font-semibold">Pagado 100%</span>',
-      'al_dia': '<span class="px-2.5 py-1 rounded-full badge-proximo text-xs font-semibold">Al Día</span>',
-      'mora': '<span class="px-2.5 py-1 rounded-full badge-mora text-xs font-semibold">En Mora</span>'
+      'pagado': '<span class="inline-block whitespace-nowrap px-2.5 py-1 rounded-full badge-al-dia text-xs font-semibold">Pagado 100%</span>',
+      'al_dia': '<span class="inline-block whitespace-nowrap px-2.5 py-1 rounded-full badge-proximo text-xs font-semibold">Al Día</span>',
+      'mora': '<span class="inline-block whitespace-nowrap px-2.5 py-1 rounded-full badge-mora text-xs font-semibold">En Mora</span>'
     };
 
     const st = effectiveStatus(s);
@@ -355,28 +355,30 @@ function renderSalesTable(searchTerm = '') {
 
     return `
       <tr class="transition-colors" style="border-color: var(--border-color);" onmouseover="this.style.background='var(--bg-card-hover)'" onmouseout="this.style.background='transparent'">
-        <td class="px-5 py-4 font-mono font-bold text-xs" style="color: var(--primary);">${s.saleNumber}</td>
-        <td class="px-5 py-4 font-semibold" style="color: var(--text-main);">${s.clientName}</td>
-        <td class="px-5 py-4 text-xs" style="color: var(--text-muted);">${s.sellerName || s.sellerUsername || '—'}</td>
-        <td class="px-5 py-4 text-center">
+        <td class="px-3 xl:px-5 py-4 font-mono font-bold text-xs whitespace-nowrap" style="color: var(--primary);">${s.saleNumber}</td>
+        <td class="px-3 xl:px-5 py-4 font-semibold" style="color: var(--text-main);">${s.clientName}
+          <div class="xl:hidden text-[10px] font-normal uppercase mt-0.5" style="color: var(--text-muted);">${s.type} · ${s.sellerName || s.sellerUsername || '—'}</div>
+        </td>
+        <td class="hidden xl:table-cell px-5 py-4 text-xs" style="color: var(--text-muted);">${s.sellerName || s.sellerUsername || '—'}</td>
+        <td class="hidden xl:table-cell px-5 py-4 text-center">
           <span class="px-2 py-0.5 rounded text-[11px] font-medium uppercase" style="${s.type === 'credito' ? 'background: var(--bg-card-hover); color: var(--text-muted);' : 'background: var(--success-bg); color: var(--success);'}">
             ${s.type}
           </span>
         </td>
-        <td class="px-5 py-4 text-right font-mono font-semibold" style="color: var(--text-main);">${formatCurrency(s.totalAmount)}
+        <td class="px-3 xl:px-5 py-4 text-right font-mono font-semibold whitespace-nowrap" style="color: var(--text-main);">${formatCurrency(s.totalAmount)}
           ${s.type !== 'contado' ? `<div class="text-[10px] font-sans font-medium" style="color: var(--text-muted);">Inicial: ${formatCurrency(s.initialPayment || 0)}</div>` : ''}
         </td>
-        <td class="px-5 py-4 text-right font-mono font-semibold" style="color: var(--success);">${formatCurrency(s.totalPaid)}</td>
-        <td class="px-5 py-4 text-right">
-          <div class="font-mono font-bold text-base" style="color: var(--warning);">${formatCurrency(s.outstandingBalance)}</div>
-          <div class="text-[10px] font-sans mt-0.5" style="color: var(--text-muted);">Cuota: <span class="font-bold font-mono" style="color: var(--text-main);">${formatCurrency(installmentValue(s))}</span></div>
+        <td class="px-3 xl:px-5 py-4 text-right font-mono font-semibold whitespace-nowrap" style="color: var(--success);">${formatCurrency(s.totalPaid)}</td>
+        <td class="px-3 xl:px-5 py-4 text-right">
+          <div class="font-mono font-bold text-base whitespace-nowrap" style="color: var(--warning);">${formatCurrency(s.outstandingBalance)}</div>
+          <div class="text-[10px] font-sans mt-0.5 whitespace-nowrap" style="color: var(--text-muted);">Cuota: <span class="font-bold font-mono" style="color: var(--text-main);">${formatCurrency(installmentValue(s))}</span></div>
           ${nd ? `<div class="text-[10px] font-sans" style="color: ${nd.daysOverdue > 0 ? 'var(--danger, #ef4444)' : 'var(--text-muted)'};">Próx: ${formatDate(nd.date)}${nd.daysOverdue > 0 ? ` (${nd.daysOverdue}d atraso)` : ''}</div>` : ''}
         </td>
-        <td class="px-5 py-4 text-center">
+        <td class="px-3 xl:px-5 py-4 text-center">
           ${statusBadges[st] || statusBadges['al_dia']}
         </td>
-        <td class="px-5 py-4 text-center">
-          <div class="flex items-center justify-center gap-1.5">
+        <td class="px-3 xl:px-5 py-4 text-center">
+          <div class="flex items-center justify-center gap-1.5 whitespace-nowrap">
             <button onclick="window.salesModule.openPaymentForSale('${s.id}')" title="Registrar abono" class="btn-primary px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1">
               <i data-lucide="plus" class="w-3.5 h-3.5"></i> Abono
             </button>
