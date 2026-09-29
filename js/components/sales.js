@@ -823,7 +823,7 @@ window.salesModule = {
             ${docBox('Cliente', `<div style="font-size:14px;font-weight:700;">${esc(clientName)}</div>
               <div style="color:#5b6b7f;margin-top:3px;">Cédula: <b style="color:#0b1220;">${esc(clientCc || '—')}</b></div>
               <div style="color:#5b6b7f;">Teléfono: <b style="color:#0b1220;">${esc(clientPhone || 'No registrado')}</b></div>`)}
-            ${docBox('Crédito', `<div style="font-size:14px;font-weight:700;font-family:'Courier New',monospace;color:#0891b2;">#${esc(saleNumber)}</div>
+            ${docBox('Crédito', `<div style="font-size:14px;font-weight:700;font-family:'Courier New',monospace;color:#16a34a;">#${esc(saleNumber)}</div>
               <div style="color:#5b6b7f;margin-top:3px;">Medio de pago: <b style="color:#0b1220;">${esc(paymentMethod)}</b></div>
               ${notes ? `<div style="color:#5b6b7f;font-style:italic;">${esc(notes)}</div>` : ''}`)}
           </div>

@@ -28,7 +28,7 @@ function messageText(sale, d) {
 
 function cardHtml(sale, d) {
   const late = d.overdue > 0;
-  const tone = late ? ['#fef2f2', '#fecaca', '#dc2626'] : ['#ecfeff', '#a5f3fc', '#0891b2'];
+  const tone = late ? ['#fef2f2', '#fecaca', '#dc2626'] : ['#ecfdf5', '#bbf7d0', '#16a34a'];
   const promised = d.client.nextPaymentDate
     ? docBox('Pago acordado', `<div style="font-weight:700;">${formatDate(d.client.nextPaymentDate)}${d.client.promisedAmount ? ` · ${formatCurrency(d.client.promisedAmount)}` : ''}</div>`, 'cyan')
     : '';
