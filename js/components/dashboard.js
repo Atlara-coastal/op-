@@ -338,7 +338,7 @@ function renderCharts(salesTotal, paidTotal, debtTotal, t1, t2, t3) {
           label: 'Monto COP ($)',
           data: [salesTotal, paidTotal, debtTotal],
           backgroundColor: [
-            'rgba(8, 145, 178, 0.85)',
+            `rgba(${cssVar('--primary-rgb') || '34, 197, 94'}, 0.85)`,
             'rgba(5, 150, 105, 0.85)',
             'rgba(217, 119, 6, 0.85)'
           ],

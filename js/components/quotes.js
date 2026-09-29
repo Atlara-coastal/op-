@@ -5,7 +5,7 @@
 
 import { db } from '../db.js';
 import { formatCurrency, formatDate, calculateProductPricing, getInterestRateByClientType, showToast } from '../utils.js';
-import { paper, docBox, esc, fitPaper, exportPdfById } from '../pdf-doc.js';
+import { paper, docBox, esc, fitPaper, exportPdfById, brand } from '../pdf-doc.js';
 
 let quoteSelectedItems = [];
 
@@ -411,7 +411,7 @@ window.quotesModule = {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           ${docBox('Cliente cotizado', `<div style="font-size:14px;font-weight:700;">${esc(q.clientName)}</div>
             <div style="color:#5b6b7f;margin-top:3px;">Tel: <b style="color:#0b1220;">${esc(q.clientPhone || 'No registrado')}</b></div>`)}
-          ${docBox('Condiciones de crédito', `<div style="font-size:14px;font-weight:700;color:#16a34a;">${q.installmentsCount} cuotas ${esc(q.frequency)}es</div>
+          ${docBox('Condiciones de crédito', `<div style="font-size:14px;font-weight:700;color:${brand().accent};">${q.installmentsCount} cuotas ${esc(q.frequency)}es</div>
             <div style="color:#5b6b7f;margin-top:3px;">Válida hasta: <b style="color:#0b1220;">${formatDate(q.validUntil)}</b></div>`, 'cyan')}
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -429,7 +429,7 @@ window.quotesModule = {
                 <td style="padding:10px;font-weight:600;">${esc(item.productName)}</td>
                 <td style="padding:10px;text-align:center;font-weight:700;">${item.quantity}</td>
                 <td style="padding:10px;text-align:right;font-family:'Courier New',monospace;">${formatCurrency(item.finalUnitPrice)}</td>
-                <td style="padding:10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#16a34a;">${formatCurrency(item.total)}</td>
+                <td style="padding:10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:${brand().accent};">${formatCurrency(item.total)}</td>
               </tr>`).join('')}
           </tbody>
         </table>

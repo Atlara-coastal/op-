@@ -3,7 +3,7 @@
  * Provides offline caching and mobile PWA installability
  */
 
-const CACHE_NAME = 'op-cache-v1';
+const CACHE_NAME = 'op-cache-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -35,6 +35,7 @@ const ASSETS_TO_CACHE = [
   './js/components/portfolio.js',
   './js/components/today.js',
   './icons/icon.svg',
+  './icons/icon-pink.svg',
   './icons/icon-32.png',
   './icons/icon-180.png',
   './icons/icon-192.png',

@@ -23,12 +23,25 @@ export function getSupabaseAdmin() {
 export const TABS = ['dashboard', 'products', 'quotes', 'clients', 'sales', 'portfolio'];
 const LEVELS = ['none', 'view', 'edit'];
 
+export const isAdminRole = (role) => role === 'admin' || role === 'superadmin';
+
+// Which business space an admin caller may manage: their own, or (superadmin)
+// the one they ask for. Returns null if the request isn't allowed.
+export async function resolveTenant(admin, caller, requested) {
+  if (caller.profile?.role === 'superadmin') {
+    if (typeof requested !== 'string' || !requested) return null;
+    const { data } = await admin.from('tenants').select('id').eq('id', requested).maybeSingle();
+    return data ? data.id : null;
+  }
+  return caller.profile?.tenant || null;
+}
+
 // Non-admins can only ever EDIT quotes; every other tab is at most "view".
 export function sanitizePerms(role, perms) {
   const out = {};
   for (const tab of TABS) {
     let level = LEVELS.includes(perms?.[tab]) ? perms[tab] : 'none';
-    if (role !== 'admin' && tab !== 'quotes' && level === 'edit') level = 'view';
+    if (!isAdminRole(role) && tab !== 'quotes' && level === 'edit') level = 'view';
     out[tab] = level;
   }
   return out;

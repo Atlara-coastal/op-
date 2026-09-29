@@ -10,8 +10,10 @@
 import { supabase, isSupabaseConfigured } from './supabase-client.js';
 import { AUTH_USERNAME_DOMAIN } from './config.js';
 import { animateModalIn, animateLoginIn } from './animations.js';
-import { loadProfile, hasAnyAccess } from './permissions.js';
+import { loadProfile, hasAnyAccess, getActiveTenant, getActiveTenantInfo, isSuperadmin, getTenants, setActiveTenant } from './permissions.js';
 import { initUsersAdmin } from './users.js';
+import { db } from './db.js';
+import { applyTenantTheme } from './theme.js';
 
 function usernameToEmail(username) {
   const clean = username.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
@@ -62,6 +64,10 @@ async function enterApp(session, onAuthenticated, errorEl) {
     }
     return false;
   }
+  // Must happen before the app renders anything: it decides which space's local
+  // cache is read and which colors/logo are shown.
+  db.setTenant(getActiveTenant());
+  applyTenantTheme(getActiveTenantInfo());
   showAppShell(true);
   onAuthenticated();
   return true;
@@ -153,8 +159,20 @@ function bindAccountModal() {
   const usernameLabel = document.getElementById('account-current-username');
   if (!openBtn || !modal) return;
 
+  const switcher = document.getElementById('tenant-switcher');
+  const tenantSelect = document.getElementById('tenant-select');
+  tenantSelect?.addEventListener('change', () => setActiveTenant(tenantSelect.value));
+
   openBtn.addEventListener('click', () => {
     if (usernameLabel) usernameLabel.textContent = getCurrentUsername() || '—';
+    if (switcher && tenantSelect) {
+      switcher.classList.toggle('hidden', !isSuperadmin());
+      if (isSuperadmin()) {
+        tenantSelect.innerHTML = getTenants()
+          .map((t) => `<option value="${t.id}" ${t.id === getActiveTenant() ? 'selected' : ''}>${t.name}</option>`)
+          .join('');
+      }
+    }
     modal.classList.remove('hidden');
     initUsersAdmin();
     if (window.lucide) window.lucide.createIcons();

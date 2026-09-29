@@ -9,6 +9,7 @@ import { supabase, isSupabaseConfigured } from './supabase-client.js';
 import { FIREBASE_CONFIG, FIREBASE_VAPID_KEY } from './config.js';
 import { getCurrentUsername } from './auth.js';
 import { showToast } from './utils.js';
+import { getActiveTenant } from './permissions.js';
 
 const TOKEN_KEY = 'crediventas_push_token';
 
@@ -119,7 +120,7 @@ async function sendTestPush(mode, btn) {
     const res = await fetch('/api/test-notification', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token}` },
-      body: JSON.stringify({ mode, token })
+      body: JSON.stringify({ mode, token, tenant: getActiveTenant() })
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) showToast(json.error || 'No se pudo enviar la notificación', 'error');

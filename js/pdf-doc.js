@@ -4,11 +4,18 @@
  * identically in light and dark themes.
  */
 
-const C = { ink: '#0b1220', muted: '#5b6b7f', line: '#e2e8f0', soft: '#f1f5f9', accent: '#16a34a', accentSoft: '#ecfdf5', accentLine: '#bbf7d0', ok: '#059669', okSoft: '#ecfdf5', warn: '#d97706', black: '#000000' };
+const C = { ink: '#0b1220', muted: '#5b6b7f', line: '#e2e8f0', soft: '#f1f5f9', ok: '#059669', okSoft: '#ecfdf5', warn: '#d97706', black: '#000000' };
 
-const LOGO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+// Accent follows the active business space (see js/theme.js applyTenantTheme).
+const PALETTES = {
+  green: { accent: '#16a34a', accentSoft: '#ecfdf5', accentLine: '#bbf7d0', bright: '#4ade80', ring: ['#86efac', '#4ade80', '#16a34a'] },
+  pink: { accent: '#db2777', accentSoft: '#fdf2f8', accentLine: '#fbcfe8', bright: '#f472b6', ring: ['#f9a8d4', '#f472b6', '#db2777'] }
+};
+export const brand = () => PALETTES[document.documentElement.dataset.tenantTheme] || PALETTES.green;
+
+const logo = (b) => 'data:image/svg+xml;utf8,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs>' +
-  '<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="150" y1="130" x2="380" y2="380"><stop offset="0" stop-color="#86efac"/><stop offset=".55" stop-color="#4ade80"/><stop offset="1" stop-color="#16a34a"/></linearGradient></defs>' +
+  `<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="150" y1="130" x2="380" y2="380"><stop offset="0" stop-color="${b.ring[0]}"/><stop offset=".55" stop-color="${b.ring[1]}"/><stop offset="1" stop-color="${b.ring[2]}"/></linearGradient></defs>` +
   '<rect width="512" height="512" rx="120" fill="#000000"/>' +
   '<g transform="rotate(-125 256 256)"><circle cx="256" cy="256" r="132" fill="none" stroke="url(#g)" stroke-width="30" stroke-linecap="round" stroke-dasharray="640 830"/></g>' +
   '<path d="M188 262l46 48 92-104" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -18,27 +25,29 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&am
 
 // Pieces for building document bodies.
 export const docBox = (label, inner, tone = 'soft') => {
-  const t = { soft: [C.soft, C.line, C.muted], ok: [C.okSoft, '#a7f3d0', C.ok], cyan: [C.accentSoft, C.accentLine, C.accent] }[tone];
+  const b = brand();
+  const t = { soft: [C.soft, C.line, C.muted], ok: [C.okSoft, '#a7f3d0', C.ok], cyan: [b.accentSoft, b.accentLine, b.accent] }[tone];
   return `<div style="background:${t[0]};border:1px solid ${t[1]};border-radius:12px;padding:12px 14px;">
     <div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:${t[2]};margin-bottom:4px;">${label}</div>${inner}</div>`;
 };
 
 export function paper({ title, number, date, body, footer = '' }) {
+  const b = brand();
   return `<div style="width:640px;box-sizing:border-box;background:#fff;color:${C.ink};font-family:'Outfit','Inter',Arial,sans-serif;">
     <div style="background:${C.black};padding:22px 28px;display:flex;align-items:center;justify-content:space-between;">
       <div style="display:flex;align-items:center;gap:12px;">
-        <img src="${LOGO}" width="46" height="46" style="border-radius:11px;display:block;" alt="">
+        <img src="${logo(b)}" width="46" height="46" style="border-radius:11px;display:block;" alt="">
         <div>
           <div style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:#fff;">OP</div>
           <div style="font-size:10px;color:#94a3b8;margin-top:1px;">${esc(title)}</div>
         </div>
       </div>
       <div style="text-align:right;">
-        <div style="font-family:'Courier New',monospace;font-size:15px;font-weight:700;color:#4ade80;">${esc(number)}</div>
+        <div style="font-family:'Courier New',monospace;font-size:15px;font-weight:700;color:${b.bright};">${esc(number)}</div>
         <div style="font-size:11px;color:#cbd5e1;margin-top:2px;">${esc(date)}</div>
       </div>
     </div>
-    <div style="height:4px;background:linear-gradient(90deg,#16a34a,#4ade80);"></div>
+    <div style="height:4px;background:linear-gradient(90deg,${b.accent},${b.bright});"></div>
     <div style="padding:24px 28px;display:flex;flex-direction:column;gap:16px;font-size:12px;">${body}</div>
     <div style="padding:14px 28px 20px;border-top:1px solid ${C.line};display:flex;justify-content:space-between;align-items:flex-end;font-size:10px;color:${C.muted};">
       <div>${footer}</div>

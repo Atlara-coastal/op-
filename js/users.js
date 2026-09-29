@@ -4,7 +4,7 @@
  * the /api/create-user and /api/users serverless functions.
  */
 import { supabase } from './supabase-client.js';
-import { TABS, TAB_LABELS, isAdmin } from './permissions.js';
+import { TABS, TAB_LABELS, isAdmin, isSuperadmin, getActiveTenant } from './permissions.js';
 import { showToast } from './utils.js';
 
 const LEVEL_LABEL = { none: 'Sin acceso', view: 'Solo ver', edit: 'Ver y editar' };
@@ -83,7 +83,8 @@ async function renderList(root) {
   const list = root.querySelector('#users-list');
   list.innerHTML = '<p class="text-xs" style="color: var(--text-muted);">Cargando…</p>';
   try {
-    const { users } = await api('/api/users', 'GET');
+    // A superadmin manages the accounts of the space currently selected.
+    const { users } = await api(isSuperadmin() ? `/api/users?tenant=${encodeURIComponent(getActiveTenant())}` : '/api/users', 'GET');
     list.innerHTML = users.map((u) => `
       <div class="p-3 rounded-xl space-y-2" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);" data-user="${u.user_id}">
         <div class="flex items-center justify-between gap-2">
@@ -175,7 +176,8 @@ export function initUsersAdmin() {
         username,
         password: root.querySelector('#new-password').value,
         role: roleSel.value,
-        perms: readPerms(root, 'new')
+        perms: readPerms(root, 'new'),
+        ...(isSuperadmin() ? { tenant: getActiveTenant() } : {})
       });
       showToast(`Cuenta "${username}" creada`, 'success');
       form.reset();

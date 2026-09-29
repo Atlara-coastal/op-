@@ -32,14 +32,33 @@ let loaded = !isSupabaseConfigured;
 
 let sellers = [];
 
+// Business spaces ("tenants"). Each account belongs to one; a superadmin belongs
+// to none and picks which one to work in (remembered on this device).
+const ACTIVE_TENANT_KEY = 'op_active_tenant';
+let tenants = [];
+let activeTenant = null;
+
 export async function loadProfile(userId) {
   if (!isSupabaseConfigured || !supabase) return profile;
-  const { data } = await supabase.from('profiles').select('role, perms, username').eq('user_id', userId).maybeSingle();
+  const { data } = await supabase.from('profiles').select('role, perms, username, tenant').eq('user_id', userId).maybeSingle();
   profile = data || { role: 'none', perms: {} };
   loaded = true;
-  // Admins can read every profile: use them as the list of possible sellers.
-  if (profile.role === 'admin') {
-    const { data: all } = await supabase.from('profiles').select('username').order('username');
+
+  const { data: tenantRows } = await supabase.from('tenants').select('id, name, theme').order('name');
+  tenants = tenantRows || [];
+  if (profile.role === 'superadmin') {
+    let saved = null;
+    try { saved = localStorage.getItem(ACTIVE_TENANT_KEY); } catch {}
+    activeTenant = tenants.some((t) => t.id === saved) ? saved : tenants[0]?.id || null;
+  } else {
+    activeTenant = profile.tenant || null;
+  }
+
+  // Admins can read their space's profiles: use them as the list of possible sellers.
+  if (isAdmin()) {
+    let q = supabase.from('profiles').select('username').order('username');
+    if (activeTenant) q = q.eq('tenant', activeTenant);
+    const { data: all } = await q;
     sellers = (all || []).map((p) => p.username);
   } else if (profile.username) {
     sellers = [profile.username];
@@ -50,11 +69,24 @@ export async function loadProfile(userId) {
 export const getMyUsername = () => profile.username || null;
 export const getSellers = () => sellers;
 
-export const isAdmin = () => profile.role === 'admin';
-export const hasAnyAccess = () => !loaded || isAdmin() || TABS.some((t) => level(t) !== 'none');
+export const isSuperadmin = () => profile.role === 'superadmin';
+export const isAdmin = () => profile.role === 'admin' || profile.role === 'superadmin';
+// Without a space there is no data to show (e.g. an account created before spaces existed).
+export const hasAnyAccess = () => !loaded || ((!isSupabaseConfigured || !!activeTenant) && (isAdmin() || TABS.some((t) => level(t) !== 'none')));
+
+export const getTenants = () => tenants;
+export const getActiveTenant = () => activeTenant;
+export const getActiveTenantInfo = () => tenants.find((t) => t.id === activeTenant) || null;
+
+// Superadmin only: switch space. Reloads so every view and the local cache restart clean.
+export function setActiveTenant(id) {
+  if (!isSuperadmin() || !tenants.some((t) => t.id === id)) return;
+  try { localStorage.setItem(ACTIVE_TENANT_KEY, id); } catch {}
+  window.location.reload();
+}
 
 export function level(tab) {
-  if (!loaded || profile.role === 'admin') return 'edit';
+  if (!loaded || isAdmin()) return 'edit';
   return profile.perms?.[tab] || 'none';
 }
 

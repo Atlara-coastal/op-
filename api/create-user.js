@@ -5,7 +5,7 @@
  *
  * Only admins can create accounts. The service_role key stays on the server.
  */
-import { getSupabaseAdmin, usernameToEmail, getCaller, sanitizePerms } from './_supabaseAdmin.js';
+import { getSupabaseAdmin, usernameToEmail, getCaller, sanitizePerms, isAdminRole, resolveTenant } from './_supabaseAdmin.js';
 
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
 
@@ -28,12 +28,18 @@ export default async function handler(req, res) {
     res.status(caller.status).json({ error: caller.error });
     return;
   }
-  if (caller.profile?.role !== 'admin') {
+  if (!isAdminRole(caller.profile?.role)) {
     res.status(403).json({ error: 'Solo un administrador puede crear cuentas.' });
     return;
   }
 
   const { username, password, role, perms } = req.body || {};
+  // New accounts always land in the caller's space (a superadmin says which one).
+  const tenant = await resolveTenant(admin, caller, req.body?.tenant);
+  if (!tenant) {
+    res.status(400).json({ error: 'No se pudo determinar el espacio para la nueva cuenta.' });
+    return;
+  }
   if (typeof username !== 'string' || !USERNAME_RE.test(username)) {
     res.status(400).json({ error: 'Usuario inválido (usa 3-32 caracteres: letras, números, punto, guion).' });
     return;
@@ -64,7 +70,8 @@ export default async function handler(req, res) {
     user_id: created.user.id,
     username: cleanUsername,
     role: finalRole,
-    perms: sanitizePerms(finalRole, perms)
+    perms: sanitizePerms(finalRole, perms),
+    tenant
   });
   if (profileError) {
     await admin.auth.admin.deleteUser(created.user.id);

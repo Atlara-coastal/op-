@@ -65,7 +65,7 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 
-<body class="min-h-screen selection:bg-cyan-300 selection:text-cyan-950">
+<body class="min-h-screen">
 
   <!-- Animated launch splash (once per session): a progress ring closes into a
        checkmark inside the glass tile, then the wordmark fades in. -->
@@ -149,14 +149,14 @@
       <div id="brand-home" role="button" tabindex="0" title="Ir al inicio" class="flex items-center gap-3 cursor-pointer select-none">
         <div class="w-10 h-10 rounded-xl p-0.5" style="background: var(--bg-card-solid); border: 1px solid var(--border-color);">
           <div class="w-full h-full rounded-[10px] overflow-hidden">
-            <img src="./icons/icon.svg" alt="OP" class="w-full h-full object-cover">
+            <img data-brand-logo src="./icons/icon.svg" alt="OP" class="w-full h-full object-cover">
           </div>
         </div>
         <div class="min-w-0">
           <span class="text-lg sm:text-xl font-black tracking-tight flex items-center gap-1.5 font-['Outfit'] truncate" style="color: var(--text-main);">
             OP
           </span>
-          <p class="text-[10px] hidden sm:block whitespace-nowrap overflow-hidden text-ellipsis" style="color: var(--text-muted);">Ventas &bull; Créditos &bull; Cartera &bull; Clientes</p>
+          <p id="brand-subtitle" class="text-[10px] hidden sm:block whitespace-nowrap overflow-hidden text-ellipsis" style="color: var(--text-muted);">Ventas &bull; Créditos &bull; Cartera &bull; Clientes</p>
         </div>
       </div>
 
@@ -261,6 +261,13 @@
           <p class="text-[11px] uppercase tracking-wider font-bold" style="color: var(--text-muted);">Sesión activa</p>
           <p id="account-current-username" class="text-sm font-bold truncate" style="color: var(--text-main);">—</p>
         </div>
+      </div>
+
+      <!-- Superadmin only: pick which business space to work in -->
+      <div id="tenant-switcher" class="hidden p-3 rounded-xl space-y-2" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
+        <label for="tenant-select" class="text-[11px] uppercase tracking-wider font-bold block" style="color: var(--text-muted);">Espacio de trabajo</label>
+        <select id="tenant-select" class="input-field w-full px-3 py-2 text-sm"></select>
+        <p class="text-[11px]" style="color: var(--text-muted);">Cada espacio tiene sus propios clientes, ventas, abonos y usuarios.</p>
       </div>
 
       <button id="enable-push-btn" class="btn-glass w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2">

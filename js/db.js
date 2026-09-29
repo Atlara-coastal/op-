@@ -20,7 +20,7 @@ function writeAllowed(collection) {
 
 const DB_PREFIX = 'crediventas_';
 const SYNCED_COLLECTIONS = ['products', 'clients', 'sales', 'payments', 'quotes'];
-const PENDING_KEY = DB_PREFIX + 'pending_sync';
+const PENDING_SUFFIX = 'pending_sync';
 
 // Initial sample data if local state is empty
 const INITIAL_PRODUCTS = [
@@ -253,6 +253,8 @@ const INITIAL_QUOTES = [
 
 class DBManager {
   constructor() {
+    this.prefix = DB_PREFIX;
+    this.tenant = null; // business space; set right after login (see setTenant)
     this.initLocalStorage();
     this.initIndexedDB();
     this.cloudMode = isSupabaseConfigured; // this deployment syncs to Supabase at all
@@ -266,6 +268,19 @@ class DBManager {
       window.addEventListener('online', () => this.flushPendingQueue());
       // Safety net: some WebViews don't fire 'online' reliably.
       setInterval(() => this.flushPendingQueue(), 20000);
+    }
+  }
+
+  // Scope everything to one business space: local cache + pending queue live under
+  // a per-tenant key (so two accounts on the same device never see or upload each
+  // other's data), pulls are filtered by it and every upload is stamped with it.
+  setTenant(tenant) {
+    this.tenant = tenant || null;
+    this.prefix = tenant ? `${DB_PREFIX}${tenant}_` : DB_PREFIX;
+    if (tenant) {
+      SYNCED_COLLECTIONS.forEach((c) => {
+        if (!localStorage.getItem(this.prefix + c)) localStorage.setItem(this.prefix + c, '[]');
+      });
     }
   }
 
@@ -296,7 +311,7 @@ class DBManager {
         this.saveCollection(collection, rows.map((row) => row.data));
       } catch (err) {
         // Offline or network failure: keep whatever is already cached locally.
-        console.warn(`[JocoAdmin] Sin conexión para sincronizar "${collection}", se usa la copia local.`, err.message);
+        console.warn(`[OP] Sin conexión para sincronizar "${collection}", se usa la copia local.`, err.message);
       }
     }
 
@@ -313,10 +328,14 @@ class DBManager {
     const PAGE = 1000;
     let rows = [];
     for (let from = 0; ; from += PAGE) {
-      const { data, error } = await supabase
+      let query = supabase
         .from(collection)
         .select('id, data')
-        .eq('deleted', false)
+        .eq('deleted', false);
+      // RLS already limits normal users to their tenant; the explicit filter is what
+      // keeps a superadmin (who may read every tenant) on the space they picked.
+      if (this.tenant) query = query.eq('tenant', this.tenant);
+      const { data, error } = await query
         .order('updated_at', { ascending: false })
         .order('id', { ascending: true })
         .range(from, from + PAGE - 1);
@@ -336,14 +355,14 @@ class DBManager {
 
   getPendingQueue() {
     try {
-      return JSON.parse(localStorage.getItem(PENDING_KEY)) || [];
+      return JSON.parse(localStorage.getItem(this.prefix + PENDING_SUFFIX)) || [];
     } catch {
       return [];
     }
   }
 
   savePendingQueue(queue) {
-    localStorage.setItem(PENDING_KEY, JSON.stringify(queue));
+    localStorage.setItem(this.prefix + PENDING_SUFFIX, JSON.stringify(queue));
     if (this.onQueueChange) this.onQueueChange(queue.length);
   }
 
@@ -352,6 +371,7 @@ class DBManager {
   }
 
   enqueue(op) {
+    op.tenant = this.tenant;
     const queue = this.getPendingQueue();
     const idx = queue.findIndex((o) => o.collection === op.collection && o.id === op.id);
     if (idx !== -1) queue[idx] = op;
@@ -360,7 +380,8 @@ class DBManager {
   }
 
   async flushPendingQueue() {
-    if (this._flushing || !this.cloudMode || !supabase) return;
+    // No tenant yet (not logged in): nothing can be written — RLS requires one.
+    if (this._flushing || !this.cloudMode || !supabase || !this.tenant) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
 
     const queue = this.getPendingQueue();
@@ -372,9 +393,10 @@ class DBManager {
     try {
       for (const op of queue) {
         try {
+          const tenant = op.tenant || this.tenant;
           const { error } = op.type === 'delete'
-            ? await supabase.from(op.collection).upsert({ id: op.id, deleted: true, updated_at: new Date().toISOString() })
-            : await supabase.from(op.collection).upsert({ id: op.id, data: op.item, updated_at: new Date().toISOString(), deleted: false });
+            ? await supabase.from(op.collection).upsert({ id: op.id, tenant, deleted: true, updated_at: new Date().toISOString() })
+            : await supabase.from(op.collection).upsert({ id: op.id, tenant, data: op.item, updated_at: new Date().toISOString(), deleted: false });
           if (error) throw error;
           sent.set(opKey(op), JSON.stringify(op));
         } catch (err) {
@@ -410,6 +432,8 @@ class DBManager {
   applyRemoteChange(collection, payload) {
     const items = this.getCollection(collection);
     const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
+    // A superadmin receives changes from every tenant; only apply the active one.
+    if (this.tenant && row.tenant && row.tenant !== this.tenant) return;
     // A local write to this record is still queued: the local copy is newer than
     // this event (usually the late echo of an earlier save), so don't let it win.
     if (this.getPendingQueue().some((o) => o.collection === collection && o.id === row.id)) return;
@@ -528,12 +552,12 @@ class DBManager {
 
   // --- LocalStorage Generic CRUD Methods ---
   getCollection(key) {
-    const data = localStorage.getItem(DB_PREFIX + key);
+    const data = localStorage.getItem(this.prefix + key);
     return data ? JSON.parse(data) : [];
   }
 
   saveCollection(key, items) {
-    localStorage.setItem(DB_PREFIX + key, JSON.stringify(items));
+    localStorage.setItem(this.prefix + key, JSON.stringify(items));
   }
 
   addItem(key, item) {

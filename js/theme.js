@@ -41,6 +41,19 @@ function updateToggleIcon(theme) {
   }
 }
 
+// Per-space branding (see tenants.theme in the database): accent palette via the
+// data-tenant-theme attribute (styles.css), matching logo, and the space's name
+// under the header brand.
+const TENANT_LOGOS = { green: './icons/icon.svg', pink: './icons/icon-pink.svg' };
+
+export function applyTenantTheme(tenant) {
+  const theme = TENANT_LOGOS[tenant?.theme] ? tenant.theme : 'green';
+  document.documentElement.dataset.tenantTheme = theme;
+  document.querySelectorAll('[data-brand-logo]').forEach((img) => { img.src = TENANT_LOGOS[theme]; });
+  const sub = document.getElementById('brand-subtitle');
+  if (sub && tenant?.name) sub.textContent = tenant.name;
+}
+
 export function initTheme() {
   applyTheme(getPreferredTheme());
   const btn = document.getElementById('theme-toggle-btn');

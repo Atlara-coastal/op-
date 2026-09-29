@@ -4,7 +4,7 @@
  * to deliver and due date, and shares it as a PNG (WhatsApp on mobile).
  */
 import { db } from './db.js';
-import { paper, docBox, esc, fitPaper, exportImage } from './pdf-doc.js';
+import { paper, docBox, esc, fitPaper, exportImage, brand } from './pdf-doc.js';
 import { scheduleDates, installmentValue, nextDue, bogotaToday } from './due.js';
 import { formatCurrency, formatDate } from './utils.js';
 
@@ -28,7 +28,8 @@ function messageText(sale, d) {
 
 function cardHtml(sale, d) {
   const late = d.overdue > 0;
-  const tone = late ? ['#fef2f2', '#fecaca', '#dc2626'] : ['#ecfdf5', '#bbf7d0', '#16a34a'];
+  const b = brand();
+  const tone = late ? ['#fef2f2', '#fecaca', '#dc2626'] : [b.accentSoft, b.accentLine, b.accent];
   const promised = d.client.nextPaymentDate
     ? docBox('Pago acordado', `<div style="font-weight:700;">${formatDate(d.client.nextPaymentDate)}${d.client.promisedAmount ? ` · ${formatCurrency(d.client.promisedAmount)}` : ''}</div>`, 'cyan')
     : '';

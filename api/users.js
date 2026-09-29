@@ -4,7 +4,7 @@
  *   PATCH   -> { userId, role?, perms?, password? }  update role/permissions/password
  *   DELETE  -> { userId }  remove account
  */
-import { getSupabaseAdmin, getCaller, sanitizePerms } from './_supabaseAdmin.js';
+import { getSupabaseAdmin, getCaller, sanitizePerms, isAdminRole, resolveTenant } from './_supabaseAdmin.js';
 
 export default async function handler(req, res) {
   let admin;
@@ -20,15 +20,29 @@ export default async function handler(req, res) {
     res.status(caller.status).json({ error: caller.error });
     return;
   }
-  if (caller.profile?.role !== 'admin') {
+  if (!isAdminRole(caller.profile?.role)) {
     res.status(403).json({ error: 'Solo un administrador puede gestionar cuentas.' });
     return;
   }
 
   const body = req.body || {};
+  const isSuper = caller.profile.role === 'superadmin';
+
+  // Accounts of another space are invisible and untouchable (superadmin excepted).
+  const loadTarget = async (userId) => {
+    const { data: target } = await admin.from('profiles').select('*').eq('user_id', userId).maybeSingle();
+    if (!target) return null;
+    if (!isSuper && (target.role === 'superadmin' || target.tenant !== caller.profile.tenant)) return null;
+    return target;
+  };
 
   if (req.method === 'GET') {
-    const { data, error } = await admin.from('profiles').select('user_id, username, role, perms, created_at').order('created_at');
+    const tenant = await resolveTenant(admin, caller, req.query?.tenant);
+    if (!tenant) {
+      res.status(400).json({ error: 'Espacio no válido.' });
+      return;
+    }
+    const { data, error } = await admin.from('profiles').select('user_id, username, role, perms, created_at').eq('tenant', tenant).order('created_at');
     if (error) {
       res.status(500).json({ error: error.message });
       return;
@@ -43,13 +57,14 @@ export default async function handler(req, res) {
       res.status(400).json({ error: 'Falta userId.' });
       return;
     }
-    const { data: target } = await admin.from('profiles').select('*').eq('user_id', userId).maybeSingle();
+    const target = await loadTarget(userId);
     if (!target) {
       res.status(404).json({ error: 'Usuario no encontrado.' });
       return;
     }
-    const finalRole = role === 'admin' || role === 'user' ? role : target.role;
-    if (userId === caller.user.id && finalRole !== 'admin') {
+    // The superadmin role is never granted or removed from the UI.
+    const finalRole = target.role === 'superadmin' ? 'superadmin' : (role === 'admin' || role === 'user' ? role : target.role);
+    if (userId === caller.user.id && !isAdminRole(finalRole)) {
       res.status(400).json({ error: 'No puedes quitarte a ti mismo el rol de administrador.' });
       return;
     }
@@ -84,6 +99,11 @@ export default async function handler(req, res) {
     }
     if (userId === caller.user.id) {
       res.status(400).json({ error: 'No puedes eliminar tu propia cuenta.' });
+      return;
+    }
+    const target = await loadTarget(userId);
+    if (!target || target.role === 'superadmin') {
+      res.status(404).json({ error: 'Usuario no encontrado.' });
       return;
     }
     const { error } = await admin.auth.admin.deleteUser(userId);

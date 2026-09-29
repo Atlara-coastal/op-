@@ -163,7 +163,7 @@ function drawChart(rows) {
     type: 'bar',
     data: {
       labels: rows.map((g) => labelOf(g.key, state.group)),
-      datasets: [{ label: 'Recaudado', data: rows.map((g) => g.total), backgroundColor: 'rgba(34, 211, 238, 0.85)', borderRadius: 6, borderWidth: 0 }]
+      datasets: [{ label: 'Recaudado', data: rows.map((g) => g.total), backgroundColor: `rgba(${getComputedStyle(document.documentElement).getPropertyValue('--primary-rgb').trim() || '34, 197, 94'}, 0.85)`, borderRadius: 6, borderWidth: 0 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,

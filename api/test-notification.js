@@ -43,9 +43,11 @@ export default async function handler(req, res) {
     let notification = { title: 'Prueba de OP', body: 'Si ves esto, las notificaciones funcionan correctamente.' };
     let due = null;
     if (req.body?.mode === 'due') {
-      const isAdmin = caller.profile.role === 'admin';
-      const { data: rows } = await db.from('sales').select('data').eq('deleted', false);
-      const { data: clientRows } = await db.from('clients').select('data').eq('deleted', false);
+      const isAdmin = caller.profile.role === 'admin' || caller.profile.role === 'superadmin';
+      // Only the caller's own business space (a superadmin passes the one it's viewing).
+      const tenant = caller.profile.role === 'superadmin' ? req.body?.tenant : caller.profile.tenant;
+      const { data: rows } = await db.from('sales').select('data').eq('deleted', false).eq('tenant', tenant || '');
+      const { data: clientRows } = await db.from('clients').select('data').eq('deleted', false).eq('tenant', tenant || '');
       const clients = (clientRows || []).map((r) => r.data);
       const sales = (rows || []).map((r) => r.data).filter((s) => isAdmin || s.sellerUsername === username);
       const list = getDueToday(sales, clients, bogotaToday()).map((x) => x.sale);
