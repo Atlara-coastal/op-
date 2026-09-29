@@ -24,7 +24,7 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS: compiled statically at build time (see tailwind.config.js / build.js).
        Using the CDN runtime compiler here would mean no styling until a network
@@ -67,17 +67,28 @@
 
 <body class="min-h-screen selection:bg-cyan-300 selection:text-cyan-950">
 
-  <!-- Animated launch splash (once per session): the hexagon "signal" badge draws
-       itself in, then the wordmark fades in — no gradients/blur, flat "Signal" look. -->
+  <!-- Animated launch splash (once per session): a progress ring closes into a
+       checkmark inside the glass tile, then the wordmark fades in. -->
   <div id="splash" aria-hidden="true">
     <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-      <rect width="512" height="512" fill="#000000"/>
-      <polygon class="sp-hex" pathLength="100"
-        points="256,26 455.2,141 455.2,371 256,486 56.8,371 56.8,141"
-        fill="none" stroke="#4ade80" stroke-width="10"/>
-      <text class="sp-letters" x="256" y="298" font-family="'Space Grotesk', Arial, sans-serif" font-weight="700" font-size="150" text-anchor="middle" fill="#4ade80">OP</text>
+      <defs>
+        <linearGradient id="sp-tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f2417"/><stop offset="1" stop-color="#000000"/></linearGradient>
+        <linearGradient id="sp-sheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".11"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></linearGradient>
+        <linearGradient id="sp-ring" gradientUnits="userSpaceOnUse" x1="150" y1="130" x2="380" y2="380"><stop offset="0" stop-color="#86efac"/><stop offset=".55" stop-color="#4ade80"/><stop offset="1" stop-color="#16a34a"/></linearGradient>
+        <filter id="sp-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="14"/></filter>
+      </defs>
+      <g class="sp-tile">
+        <rect x="4" y="4" width="504" height="504" rx="116" fill="url(#sp-tile)"/>
+        <rect x="4" y="4" width="504" height="504" rx="116" fill="url(#sp-sheen)"/>
+        <rect x="5" y="5" width="502" height="502" rx="115" fill="none" stroke="#fff" stroke-opacity=".10" stroke-width="2"/>
+        <g transform="rotate(-125 256 256)">
+          <circle class="sp-ringglow" cx="256" cy="256" r="132" fill="none" stroke="#4ade80" stroke-width="30" filter="url(#sp-blur)" stroke-linecap="round" pathLength="100" stroke-dasharray="77 100"/>
+          <circle class="sp-ring" cx="256" cy="256" r="132" fill="none" stroke="url(#sp-ring)" stroke-width="26" stroke-linecap="round" pathLength="100" stroke-dasharray="77 100"/>
+        </g>
+        <path class="sp-check" d="M188 262l46 48 92-104" fill="none" stroke="#fff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
     </svg>
-    <div class="sp-word">OP<span>GESTIÓN</span></div>
+    <div class="sp-word">OP</div>
   </div>
   <script>
     (function () {

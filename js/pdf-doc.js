@@ -7,10 +7,11 @@
 const C = { ink: '#0b1220', muted: '#5b6b7f', line: '#e2e8f0', soft: '#f1f5f9', accent: '#16a34a', accentSoft: '#ecfdf5', accentLine: '#bbf7d0', ok: '#059669', okSoft: '#ecfdf5', warn: '#d97706', black: '#000000' };
 
 const LOGO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">' +
-  '<rect width="512" height="512" fill="#000000"/>' +
-  '<polygon points="256,26 455.2,141 455.2,371 256,486 56.8,371 56.8,141" fill="none" stroke="#4ade80" stroke-width="16"/>' +
-  '<text x="256" y="298" font-family="Arial,sans-serif" font-weight="700" font-size="150" text-anchor="middle" fill="#4ade80">OP</text></svg>'
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs>' +
+  '<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="150" y1="130" x2="380" y2="380"><stop offset="0" stop-color="#86efac"/><stop offset=".55" stop-color="#4ade80"/><stop offset="1" stop-color="#16a34a"/></linearGradient></defs>' +
+  '<rect width="512" height="512" rx="120" fill="#000000"/>' +
+  '<g transform="rotate(-125 256 256)"><circle cx="256" cy="256" r="132" fill="none" stroke="url(#g)" stroke-width="30" stroke-linecap="round" stroke-dasharray="640 830"/></g>' +
+  '<path d="M188 262l46 48 92-104" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 );
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -23,7 +24,7 @@ export const docBox = (label, inner, tone = 'soft') => {
 };
 
 export function paper({ title, number, date, body, footer = '' }) {
-  return `<div style="width:640px;box-sizing:border-box;background:#fff;color:${C.ink};font-family:'Space Grotesk','Inter',Arial,sans-serif;">
+  return `<div style="width:640px;box-sizing:border-box;background:#fff;color:${C.ink};font-family:'Outfit','Inter',Arial,sans-serif;">
     <div style="background:${C.black};padding:22px 28px;display:flex;align-items:center;justify-content:space-between;">
       <div style="display:flex;align-items:center;gap:12px;">
         <img src="${LOGO}" width="46" height="46" style="border-radius:11px;display:block;" alt="">

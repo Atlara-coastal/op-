@@ -1,11 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="10"/></filter>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f2417"/><stop offset="1" stop-color="#000000"/></linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".11"/><stop offset=".55" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="ring" gradientUnits="userSpaceOnUse" x1="150" y1="130" x2="380" y2="380"><stop offset="0" stop-color="#86efac"/><stop offset=".55" stop-color="#4ade80"/><stop offset="1" stop-color="#16a34a"/></linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="14"/></filter>
   </defs>
-  <rect width="512" height="512" fill="#000000"/>
-  <!-- Signal badge: pointy-top hexagon, flat fill, no gradient/blur -->
-  <polygon points="256,26 455.2,141 455.2,371 256,486 56.8,371 56.8,141" fill="none" stroke="#4ade80" stroke-width="24" opacity=".35" filter="url(#glow)"/>
-  <polygon points="256,26 455.2,141 455.2,371 256,486 56.8,371 56.8,141" fill="none" stroke="#4ade80" stroke-width="10"/>
-  <polygon points="256,56 429.2,156 429.2,356 256,456 82.8,356 82.8,156" fill="#4ade80" opacity=".08"/>
-  <text x="256" y="298" font-family="'Space Grotesk', Arial, sans-serif" font-weight="700" font-size="150" text-anchor="middle" fill="#4ade80">OP</text>
+  <rect x="4" y="4" width="504" height="504" rx="116" fill="url(#tile)"/>
+  <rect x="4" y="4" width="504" height="504" rx="116" fill="url(#sheen)"/>
+  <rect x="5" y="5" width="502" height="502" rx="115" fill="none" stroke="#ffffff" stroke-opacity=".10" stroke-width="2"/>
+  <g transform="rotate(-125 256 256)">
+    <circle cx="256" cy="256" r="132" fill="none" stroke="#4ade80" stroke-width="30" opacity=".45" filter="url(#glow)" stroke-linecap="round" stroke-dasharray="640 830"/>
+    <circle cx="256" cy="256" r="132" fill="none" stroke="url(#ring)" stroke-width="26" stroke-linecap="round" stroke-dasharray="640 830"/>
+  </g>
+  <path d="M188 262l46 48 92-104" fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
