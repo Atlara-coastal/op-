@@ -512,12 +512,13 @@ html.restoring-session #login-screen { display: none !important; }
 }
 html[data-tenant-theme="pink"] #boot-loader .bl-logo { background-image: url(./icons/icon-pink.svg); }
 #boot-loader .bl-bar { width: 120px; height: 3px; border-radius: 3px; background: var(--border-color); overflow: hidden; }
-#boot-loader .bl-bar span { display: block; width: 40%; height: 100%; border-radius: 3px; background: var(--primary-gradient); animation: bl-slide 1.1s ease-in-out infinite; }
+/* Fills smoothly toward ~90% while loading; js/auth.js completes it to 100% before fading out. */
+#boot-loader .bl-bar span { display: block; width: 0; height: 100%; border-radius: 3px; background: var(--primary-gradient); animation: bl-fill 2.2s cubic-bezier(.15, .7, .25, 1) forwards; }
 #boot-loader p { font-size: 12px; font-weight: 600; color: var(--text-muted); animation: bl-fade .4s ease .15s both; }
 #boot-loader.bl-out { animation: bl-out .35s ease forwards; }
 @keyframes bl-pop { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
 @keyframes bl-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-@keyframes bl-slide { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
+@keyframes bl-fill { from { width: 0; } to { width: 90%; } }
 @keyframes bl-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes bl-out { to { opacity: 0; visibility: hidden; } }
 

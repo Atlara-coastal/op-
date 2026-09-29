@@ -49,8 +49,17 @@ function hideBootLoader(fade) {
   if (!html.classList.contains('restoring-session')) return;
   const loader = document.getElementById('boot-loader');
   if (!fade || !loader) { html.classList.remove('restoring-session'); return; }
-  loader.classList.add('bl-out');
-  setTimeout(() => { html.classList.remove('restoring-session'); loader.classList.remove('bl-out'); }, 350);
+  // Finish the progress bar from wherever it is to 100%, then fade the loader out.
+  const bar = loader.querySelector('.bl-bar span');
+  if (bar) {
+    bar.style.width = getComputedStyle(bar).width;
+    bar.style.animation = 'none';
+    void bar.offsetWidth;
+    bar.style.transition = 'width .3s ease-out';
+    bar.style.width = '100%';
+  }
+  setTimeout(() => loader.classList.add('bl-out'), 300);
+  setTimeout(() => { html.classList.remove('restoring-session'); loader.classList.remove('bl-out'); }, 650);
 }
 
 export function getCurrentUsername() {
