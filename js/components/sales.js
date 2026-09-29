@@ -1022,10 +1022,11 @@ window.salesModule = {
     const newInitial = n('es-initial');
 
     // The down payment made at sale time is ALSO stored as its own payment record
-    // (id ending in "-i", see saveSale) so it shows up in receipts/history like any
-    // other abono. Keep that record in sync when "Cuota inicial" is edited here,
-    // otherwise the balance below would silently ignore the new value.
-    const initialPay = payments.find(p => p.id.endsWith('-i'));
+    // (id ending in "-i", see saveSale; or tagged by notes for sales imported from
+    // Excel) so it shows up in receipts/history like any other abono. Keep that record
+    // in sync when "Cuota inicial" is edited here, otherwise the balance below would
+    // silently ignore the new value.
+    const initialPay = payments.find(p => p.id.endsWith('-i') || /^(Cuota inicial|Pago de contado) \(importado\)$/.test(p.notes || ''));
     if (initialPay && newInitial <= 0) {
       db.deleteItem('payments', initialPay.id);
       payments = payments.filter(p => p.id !== initialPay.id);

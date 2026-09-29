@@ -287,17 +287,13 @@ class DBManager {
 
     for (const collection of SYNCED_COLLECTIONS) {
       try {
-        const { data, error } = await supabase
-          .from(collection)
-          .select('id, data')
-          .eq('deleted', false)
-          .order('updated_at', { ascending: false });
+        const { rows, error } = await this.fetchAllRows(collection);
 
         if (error) {
-          console.error(`[JocoAdmin] Error al sincronizar "${collection}":`, error.message);
+          console.error(`[OP] Error al sincronizar "${collection}":`, error.message);
           continue;
         }
-        this.saveCollection(collection, data.map((row) => row.data));
+        this.saveCollection(collection, rows.map((row) => row.data));
       } catch (err) {
         // Offline or network failure: keep whatever is already cached locally.
         console.warn(`[JocoAdmin] Sin conexión para sincronizar "${collection}", se usa la copia local.`, err.message);
@@ -308,6 +304,26 @@ class DBManager {
     this.subscribeRealtime();
     // Views were drawn from the local cache; redraw with the freshly pulled data.
     if (this.onRemoteChange) this.onRemoteChange('sync');
+  }
+
+  // Supabase caps every request at 1000 rows, so a single select silently dropped
+  // the oldest records once a collection grew past that (e.g. payments), which also
+  // made totals recomputed from the local copy come out too low. Page through it all.
+  async fetchAllRows(collection) {
+    const PAGE = 1000;
+    let rows = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from(collection)
+        .select('id, data')
+        .eq('deleted', false)
+        .order('updated_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) return { rows: [], error };
+      rows = rows.concat(data);
+      if (data.length < PAGE) return { rows, error: null };
+    }
   }
 
   // --- Offline write queue -------------------------------------------
