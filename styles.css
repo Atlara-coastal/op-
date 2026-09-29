@@ -4,6 +4,9 @@
    Theme is toggled by setting data-theme="light" | "dark" on <html>.
    ========================================================================== */
 
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 :root,
 :root[data-theme="light"] {
   --bg-main: #ffffff;
