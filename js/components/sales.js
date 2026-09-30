@@ -51,8 +51,6 @@ export function renderSales(container) {
               <tr>
                 <th class="px-3 xl:px-5 py-3.5 whitespace-nowrap">N° Venta</th>
                 <th class="px-3 xl:px-5 py-3.5">Cliente</th>
-                <th class="hidden xl:table-cell px-5 py-3.5">Vendedor</th>
-                <th class="hidden xl:table-cell px-5 py-3.5 text-center">Tipo</th>
                 <th class="px-3 xl:px-5 py-3.5 text-right">Monto Total</th>
                 <th class="px-3 xl:px-5 py-3.5 text-right" style="color: var(--success);">Total Pagado</th>
                 <th class="px-3 xl:px-5 py-3.5 text-right font-bold" style="color: var(--warning);">Saldo Restante</th>
@@ -339,7 +337,7 @@ function renderSalesTable(searchTerm = '') {
   );
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8" style="color: var(--text-muted);">No hay registros de ventas que coincidan.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8" style="color: var(--text-muted);">No hay registros de ventas que coincidan.</td></tr>`;
     return;
   }
 
@@ -358,14 +356,8 @@ function renderSalesTable(searchTerm = '') {
       <tr class="transition-colors" style="border-color: var(--border-color);" onmouseover="this.style.background='var(--bg-card-hover)'" onmouseout="this.style.background='transparent'">
         <td class="px-3 xl:px-5 py-4 font-mono font-bold text-xs whitespace-nowrap" style="color: var(--primary);">${s.saleNumber}</td>
         <td class="px-3 xl:px-5 py-4 font-semibold" style="color: var(--text-main);">${s.clientName}
-          <div class="xl:hidden text-[10px] font-normal uppercase mt-0.5" style="color: var(--text-muted);">${s.type} · ${s.sellerName || s.sellerUsername || '—'}</div>
+          <div class="text-[10px] font-normal uppercase mt-0.5" style="color: var(--text-muted);">${s.type} · ${s.sellerName || s.sellerUsername || '—'}</div>
           ${itemsText ? `<div class="text-[11px] font-normal mt-0.5 max-w-[240px] truncate" title="${esc(itemsText)}" style="color: var(--text-muted);">${esc(itemsText)}</div>` : ''}
-        </td>
-        <td class="hidden xl:table-cell px-5 py-4 text-xs" style="color: var(--text-muted);">${s.sellerName || s.sellerUsername || '—'}</td>
-        <td class="hidden xl:table-cell px-5 py-4 text-center">
-          <span class="px-2 py-0.5 rounded text-[11px] font-medium uppercase" style="${s.type === 'credito' ? 'background: var(--bg-card-hover); color: var(--text-muted);' : 'background: var(--success-bg); color: var(--success);'}">
-            ${s.type}
-          </span>
         </td>
         <td class="px-3 xl:px-5 py-4 text-right font-mono font-semibold whitespace-nowrap" style="color: var(--text-main);">${formatCurrency(s.totalAmount)}
           ${s.type !== 'contado' ? `<div class="text-[10px] font-sans font-medium" style="color: var(--text-muted);">Inicial: ${formatCurrency(s.initialPayment || 0)}</div>` : ''}

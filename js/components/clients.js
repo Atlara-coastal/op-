@@ -176,9 +176,14 @@ export function renderClients(container) {
               <p id="exp-client-cc" class="text-xs font-mono" style="color: var(--text-muted);">CC: -</p>
             </div>
           </div>
-          <button onclick="document.getElementById('expediente-modal').classList.add('hidden')" style="color: var(--text-muted);">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
+          <div class="flex items-center gap-2 shrink-0">
+            <button id="exp-statement-btn" type="button" title="Enviar estado de cuenta con todas sus ventas activas" class="btn-primary px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5">
+              <i data-lucide="receipt-text" class="w-4 h-4"></i> Estado de cuenta
+            </button>
+            <button onclick="document.getElementById('expediente-modal').classList.add('hidden')" style="color: var(--text-muted);">
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
         </div>
 
         <div id="expediente-body-content" class="space-y-6">
@@ -465,6 +470,8 @@ window.clientsModule = {
     if (!c) return;
 
     document.getElementById('exp-client-name').innerText = c.fullName;
+    const statementBtn = document.getElementById('exp-statement-btn');
+    if (statementBtn) statementBtn.onclick = () => window.reminderModule?.openStatement(clientId);
     document.getElementById('exp-client-cc').innerText = `CC: ${c.cc || '—'} • Edad: ${c.age || '-'} años`;
 
     const clientSales = sales.filter(s => s.clientId === clientId);
