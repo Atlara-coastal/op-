@@ -68,14 +68,12 @@ function statementRows(clientId) {
 }
 
 function statementText(client, rows, totals) {
-  const lines = rows.map(({ sale, d }) => `• Crédito #${sale.saleNumber}: saldo ${formatCurrency(d.balance)}${d.nd ? ` — cuota ${formatCurrency(d.toDeliver)} ${d.overdue > 0 ? `vencida desde el ${formatDate(d.nd.date)}` : `para el ${formatDate(d.nd.date)}`}` : ''}`);
-  return `Hola ${client.fullName}, este es el estado de tus cuentas activas:\n${lines.join('\n')}\n\nSaldo total pendiente: ${formatCurrency(totals.balance)}\nValor a entregar: ${formatCurrency(totals.toDeliver)}\n\nSi ya pagaste, envíanos el comprobante. ¡Gracias!`;
+  const lines = rows.map(({ sale, d }) => `• Crédito #${sale.saleNumber}: saldo ${formatCurrency(d.balance)}${d.nd ? ` — cuota de ${formatCurrency(d.cuota)} ${d.overdue > 0 ? `vencida desde el ${formatDate(d.nd.date)}` : `para el ${formatDate(d.nd.date)}`}` : ''}`);
+  return `Hola ${client.fullName}, este es el estado de tus cuentas activas:\n${lines.join('\n')}\n\nSaldo total pendiente: ${formatCurrency(totals.balance)}\n\nSi ya pagaste, envíanos el comprobante. ¡Gracias!`;
 }
 
 function statementCardHtml(client, rows, totals) {
   const b = brand();
-  const late = totals.overdue > 0;
-  const tone = late ? ['#fef2f2', '#fecaca', '#dc2626'] : [b.accentSoft, b.accentLine, b.accent];
   const cell = (label, value, color = '#0b1220') => `<div><div style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:#5b6b7f;">${label}</div><div style="font-family:'Courier New',monospace;font-weight:700;font-size:13px;color:${color};">${value}</div></div>`;
   const saleBlock = ({ sale, d }) => {
     const products = (sale.items || []).map((i) => esc(i.productName || 'Producto') + ((i.quantity || 1) > 1 ? ` ×${i.quantity}` : '')).join(', ');
@@ -110,16 +108,9 @@ function statementCardHtml(client, rows, totals) {
         <div style="font-size:20px;font-weight:800;line-height:1.2;">${esc(client.fullName)}</div>
         <div style="color:#5b6b7f;margin-top:4px;">Este es el resumen de tus cuentas activas.</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div style="border-radius:14px;padding:14px;text-align:center;background:#fffbeb;border:1px solid #fde68a;">
-          <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#d97706;">Saldo total pendiente</div>
-          <div style="font-size:26px;font-weight:800;font-family:'Courier New',monospace;color:#d97706;margin-top:4px;">${formatCurrency(totals.balance)}</div>
-        </div>
-        <div style="border-radius:14px;padding:14px;text-align:center;background:${tone[0]};border:1px solid ${tone[1]};">
-          <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:${tone[2]};">Valor a entregar</div>
-          <div style="font-size:26px;font-weight:800;font-family:'Courier New',monospace;color:${tone[2]};margin-top:4px;">${formatCurrency(totals.toDeliver)}</div>
-          ${late ? `<div style="font-size:10px;font-weight:600;color:#dc2626;">Incluye cuotas vencidas</div>` : ''}
-        </div>
+      <div style="border-radius:14px;padding:14px;text-align:center;background:#fffbeb;border:1px solid #fde68a;">
+        <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#d97706;">Saldo total pendiente</div>
+        <div style="font-size:28px;font-weight:800;font-family:'Courier New',monospace;color:#d97706;margin-top:4px;">${formatCurrency(totals.balance)}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;">${rows.map(saleBlock).join('')}</div>`
   });
@@ -274,11 +265,7 @@ window.reminderModule = {
       alert('Este cliente no tiene cuentas activas (todas sus ventas están pagadas).');
       return;
     }
-    const totals = {
-      balance: rows.reduce((a, r) => a + r.d.balance, 0),
-      toDeliver: rows.reduce((a, r) => a + r.d.toDeliver, 0),
-      overdue: rows.filter((r) => r.d.overdue > 0).length
-    };
+    const totals = { balance: rows.reduce((a, r) => a + r.d.balance, 0) };
     openShareModal({
       title: 'Estado de cuenta',
       cardHtml: statementCardHtml(client, rows, totals),
