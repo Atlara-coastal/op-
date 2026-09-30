@@ -352,12 +352,14 @@ function renderSalesTable(searchTerm = '') {
 
     const st = effectiveStatus(s);
     const nd = nextDue(s);
+    const itemsText = (s.items || []).map((i) => (i.productName || 'Producto') + ((i.quantity || 1) > 1 ? ` ×${i.quantity}` : '')).join(', ');
 
     return `
       <tr class="transition-colors" style="border-color: var(--border-color);" onmouseover="this.style.background='var(--bg-card-hover)'" onmouseout="this.style.background='transparent'">
         <td class="px-3 xl:px-5 py-4 font-mono font-bold text-xs whitespace-nowrap" style="color: var(--primary);">${s.saleNumber}</td>
         <td class="px-3 xl:px-5 py-4 font-semibold" style="color: var(--text-main);">${s.clientName}
           <div class="xl:hidden text-[10px] font-normal uppercase mt-0.5" style="color: var(--text-muted);">${s.type} · ${s.sellerName || s.sellerUsername || '—'}</div>
+          ${itemsText ? `<div class="text-[11px] font-normal mt-0.5 max-w-[240px] truncate" title="${esc(itemsText)}" style="color: var(--text-muted);">${esc(itemsText)}</div>` : ''}
         </td>
         <td class="hidden xl:table-cell px-5 py-4 text-xs" style="color: var(--text-muted);">${s.sellerName || s.sellerUsername || '—'}</td>
         <td class="hidden xl:table-cell px-5 py-4 text-center">

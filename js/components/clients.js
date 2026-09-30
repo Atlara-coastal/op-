@@ -6,6 +6,17 @@
 
 import { db } from '../db.js';
 import { formatCurrency, formatDate, getClientTypeBadgeHtml, showToast } from '../utils.js';
+import { esc } from '../pdf-doc.js';
+
+// What the client bought in a sale: one line per product with quantity and line total.
+const saleItemsHtml = (s) => (s.items || []).length ? `
+  <div class="mt-1.5 pt-1.5 space-y-0.5" style="border-top: 1px dashed var(--border-color);">
+    ${s.items.map((it) => `
+      <div class="flex items-center justify-between gap-3">
+        <span class="truncate" style="color: var(--text-main);">${esc(it.productName || 'Producto')} <span style="color: var(--text-muted);">× ${it.quantity || 1}</span></span>
+        <span class="font-mono shrink-0" style="color: var(--text-muted);">${formatCurrency(it.total ?? (parseFloat(it.finalUnitPrice) || 0) * (it.quantity || 1))}</span>
+      </div>`).join('')}
+  </div>` : '';
 
 let editingClientId = null;
 let currentViewingClientId = null;
@@ -536,13 +547,14 @@ window.clientsModule = {
           ${clientSales.length === 0 ? `
             <p class="text-xs italic" style="color: var(--text-muted);">Este cliente no tiene créditos ni ventas registradas aún.</p>
           ` : clientSales.map(s => `
-            <div class="p-3 rounded-xl flex items-center justify-between text-xs" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
-              <div>
+            <div class="p-3 rounded-xl flex items-start justify-between gap-2 text-xs" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
+              <div class="min-w-0 flex-1">
                 <span class="font-mono font-bold" style="color: var(--primary);">${s.saleNumber}</span> &bull;
                 <span style="color: var(--text-muted);">${formatDate(s.startDate)}</span>
                 <p style="color: var(--text-muted);">Total: <strong style="color: var(--text-main);">${formatCurrency(s.totalAmount)}</strong> &bull; Abonado: <strong style="color: var(--success);">${formatCurrency(s.totalPaid)}</strong></p>
+                ${saleItemsHtml(s)}
               </div>
-              <div class="text-right">
+              <div class="text-right shrink-0">
                 <span class="text-xs block" style="color: var(--text-muted);">Saldo Restante:</span>
                 <span class="font-bold font-mono text-sm" style="color: var(--warning);">${formatCurrency(s.outstandingBalance)}</span>
               </div>
