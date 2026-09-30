@@ -125,6 +125,61 @@ function statementCardHtml(client, rows, totals) {
   });
 }
 
+// ---- Payments summary: every abono the client has made, across all their sales.
+function paymentsOf(clientId) {
+  return db.getCollection('payments')
+    .filter((p) => p.clientId === clientId)
+    .sort((a, b) => String(a.date || a.createdAt || '').localeCompare(String(b.date || b.createdAt || '')));
+}
+
+function paymentsSummaryText(client, payments, totalPaid, pending) {
+  const last = payments[payments.length - 1];
+  return `Hola ${client.fullName}, este es el resumen de tus abonos:\n` +
+    `• ${payments.length} ${payments.length === 1 ? 'abono' : 'abonos'} por un total de ${formatCurrency(totalPaid)}\n` +
+    `• Último abono: ${formatCurrency(last.amount)} el ${formatDate(last.date || last.createdAt)}\n` +
+    `• Saldo pendiente: ${formatCurrency(pending)}\n\n¡Gracias por tus pagos!`;
+}
+
+function paymentsSummaryCardHtml(client, payments, totalPaid, pending) {
+  const accent = brand().accent;
+  const th = 'text-align:left;padding:7px 8px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:#5b6b7f;border-bottom:1px solid #e2e8f0;';
+  const td = 'padding:7px 8px;border-bottom:1px solid #f1f5f9;';
+  const rows = payments.map((p) => `
+    <tr>
+      <td style="${td}white-space:nowrap;">${formatDate(p.date || p.createdAt)}</td>
+      <td style="${td}font-family:'Courier New',monospace;color:${accent};">${esc(p.receiptNumber || '—')}</td>
+      <td style="${td}font-family:'Courier New',monospace;">#${esc(p.saleNumber || '')}</td>
+      <td style="${td}color:#5b6b7f;">${esc(p.paymentMethod || 'Efectivo')}</td>
+      <td style="${td}text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#059669;white-space:nowrap;">${formatCurrency(p.amount)}</td>
+    </tr>`).join('');
+  return paper({
+    title: 'Resumen de abonos',
+    number: `${payments.length} ${payments.length === 1 ? 'abono' : 'abonos'}`,
+    date: formatDate(new Date().toISOString()),
+    footer: 'Gracias por mantener tus pagos al día.',
+    body: `
+      <div>
+        <div style="font-size:11px;color:#5b6b7f;">Hola,</div>
+        <div style="font-size:20px;font-weight:800;line-height:1.2;">${esc(client.fullName)}</div>
+        <div style="color:#5b6b7f;margin-top:4px;">Este es el detalle de todos los abonos que has realizado.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="border-radius:14px;padding:14px;text-align:center;background:#ecfdf5;border:1px solid #a7f3d0;">
+          <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#059669;">Total abonado</div>
+          <div style="font-size:26px;font-weight:800;font-family:'Courier New',monospace;color:#059669;margin-top:4px;">${formatCurrency(totalPaid)}</div>
+        </div>
+        <div style="border-radius:14px;padding:14px;text-align:center;background:#fffbeb;border:1px solid #fde68a;">
+          <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#d97706;">Saldo pendiente</div>
+          <div style="font-size:26px;font-weight:800;font-family:'Courier New',monospace;color:#d97706;margin-top:4px;">${formatCurrency(pending)}</div>
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead><tr><th style="${th}">Fecha</th><th style="${th}">Recibo</th><th style="${th}">Crédito</th><th style="${th}">Método</th><th style="${th}text-align:right;">Valor</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`
+  });
+}
+
 function close() { document.getElementById('reminder-modal')?.remove(); }
 
 // Shared modal: preview card + "text only" WhatsApp link + share-as-image button.
@@ -181,6 +236,28 @@ window.reminderModule = {
       text: messageText(sale, d),
       phone: d.client.phone,
       filename: `Recordatorio-${sale.saleNumber}.png`
+    });
+  },
+
+  // Every payment the client has made (all sales), as a shareable image.
+  openPaymentsSummary(clientId) {
+    const client = db.getCollection('clients').find((c) => c.id === clientId);
+    if (!client) return;
+    const payments = paymentsOf(clientId);
+    if (!payments.length) {
+      alert('Este cliente todavía no tiene abonos registrados.');
+      return;
+    }
+    const totalPaid = payments.reduce((a, p) => a + (parseFloat(p.amount) || 0), 0);
+    const pending = db.getCollection('sales')
+      .filter((s) => s.clientId === clientId)
+      .reduce((a, s) => a + (parseFloat(s.outstandingBalance) || 0), 0);
+    openShareModal({
+      title: 'Resumen de abonos',
+      cardHtml: paymentsSummaryCardHtml(client, payments, totalPaid, pending),
+      text: paymentsSummaryText(client, payments, totalPaid, pending),
+      phone: client.phone,
+      filename: `Abonos-${(client.fullName || 'cliente').replace(/\s+/g, '_')}.png`
     });
   },
 

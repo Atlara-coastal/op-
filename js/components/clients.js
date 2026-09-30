@@ -176,7 +176,10 @@ export function renderClients(container) {
               <p id="exp-client-cc" class="text-xs font-mono" style="color: var(--text-muted);">CC: -</p>
             </div>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
+            <button id="exp-payments-btn" type="button" title="Enviar resumen de todos los abonos del cliente" class="btn-glass px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5">
+              <i data-lucide="wallet" class="w-4 h-4"></i> Resumen de abonos
+            </button>
             <button id="exp-statement-btn" type="button" title="Enviar estado de cuenta con todas sus ventas activas" class="btn-primary px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5">
               <i data-lucide="receipt-text" class="w-4 h-4"></i> Estado de cuenta
             </button>
@@ -472,6 +475,8 @@ window.clientsModule = {
     document.getElementById('exp-client-name').innerText = c.fullName;
     const statementBtn = document.getElementById('exp-statement-btn');
     if (statementBtn) statementBtn.onclick = () => window.reminderModule?.openStatement(clientId);
+    const paymentsBtn = document.getElementById('exp-payments-btn');
+    if (paymentsBtn) paymentsBtn.onclick = () => window.reminderModule?.openPaymentsSummary(clientId);
     document.getElementById('exp-client-cc').innerText = `CC: ${c.cc || '—'} • Edad: ${c.age || '-'} años`;
 
     const clientSales = sales.filter(s => s.clientId === clientId);

@@ -2,7 +2,7 @@
  * JocoAdmin - Mobile app-feel helpers.
  *  - Labels every table cell (data-label) so CSS can turn tables into cards on phones.
  */
-const SKIP = '#printable-quote, #printable-receipt, [data-no-stack]';
+const SKIP = '#printable-quote, #printable-receipt, #reminder-card, [data-no-stack]';
 const ACTION_HEADER = /^(acci|comprobante)/i;
 
 function enhanceTable(table) {
