@@ -125,10 +125,14 @@ function statementCardHtml(client, rows, totals) {
   });
 }
 
-// ---- Payments summary: every abono the client has made, across all their sales.
+// ---- Payments summary: the client's abonos on sales that are still open (balance
+// pending); payments of sales already paid off are left out.
 function paymentsOf(clientId) {
+  const active = new Set(db.getCollection('sales')
+    .filter((s) => s.clientId === clientId && (parseFloat(s.outstandingBalance) || 0) > 0)
+    .map((s) => s.id));
   return db.getCollection('payments')
-    .filter((p) => p.clientId === clientId)
+    .filter((p) => p.clientId === clientId && active.has(p.saleId))
     .sort((a, b) => String(a.date || a.createdAt || '').localeCompare(String(b.date || b.createdAt || '')));
 }
 
@@ -161,7 +165,7 @@ function paymentsSummaryCardHtml(client, payments, totalPaid, pending) {
       <div>
         <div style="font-size:11px;color:#5b6b7f;">Hola,</div>
         <div style="font-size:20px;font-weight:800;line-height:1.2;">${esc(client.fullName)}</div>
-        <div style="color:#5b6b7f;margin-top:4px;">Este es el detalle de todos los abonos que has realizado.</div>
+        <div style="color:#5b6b7f;margin-top:4px;">Este es el detalle de los abonos de tus cuentas activas.</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div style="border-radius:14px;padding:14px;text-align:center;background:#ecfdf5;border:1px solid #a7f3d0;">
@@ -245,7 +249,7 @@ window.reminderModule = {
     if (!client) return;
     const payments = paymentsOf(clientId);
     if (!payments.length) {
-      alert('Este cliente todavía no tiene abonos registrados.');
+      alert('Este cliente no tiene abonos en cuentas activas.');
       return;
     }
     const totalPaid = payments.reduce((a, p) => a + (parseFloat(p.amount) || 0), 0);
