@@ -26,8 +26,8 @@ function renderResult() {
       <div class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--text-muted);">${label}</div>
       <div class="text-lg font-extrabold font-mono mt-0.5" style="color: ${color};">${value}</div>
     </div>`;
-  // What is actually charged: the installment rounded to the nearest $10.000, per payment
-  // (a fortnightly plan has 2 payments per month).
+  // What is actually charged: the MONTHLY installment rounded to the nearest $10.000; a
+  // fortnightly/weekly payment is that monthly installment split in 2 / 4.
   const modal = document.getElementById('credit-calc-modal');
   const frequency = modal?.dataset.frequency || 'mensual';
   const plan = financePlan(amount, rateRaw === '' ? 0 : rateRaw, months * (parseInt(modal?.dataset.perMonth) || 1), frequency);
@@ -38,6 +38,7 @@ function renderResult() {
         <div class="text-2xl font-extrabold font-mono" style="color: var(--text-main);">${formatCurrency(plan.installment)} <span class="text-xs font-semibold" style="color: var(--text-muted);">${frequency}</span></div>
       </div>
       <div class="text-xs text-right" style="color: var(--text-muted);">
+        ${frequency !== 'mensual' ? `Cuota mensual <b style="color: var(--text-main);">${formatCurrency(plan.monthly)}</b> ÷ ${modal?.dataset.perMonth}<br>` : ''}
         ${plan.installments} ${plan.installments === 1 ? 'pago' : 'pagos'} · Total <b style="color: var(--text-main);">${formatCurrency(plan.financed)}</b><br>
         Intereses <b style="color: var(--warning);">${formatCurrency(plan.interest)}</b>
       </div>

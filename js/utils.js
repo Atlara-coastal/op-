@@ -54,9 +54,9 @@ export function amortization(principal, ratePct, months) {
   return { principal: P, ratePct: i * 100, months: m, installment, totalPaid, totalInterest: totalPaid - P, rows };
 }
 
-// Installments are charged in round figures: the exact installment goes to the NEAREST
-// $10.000 (183.686 → 180.000, 91.843 → 90.000) and the total of the plan follows it
-// (installment × payments). It never rounds below what repays the capital, and a plan
+// Installments are charged in round figures: the exact MONTHLY installment goes to the
+// NEAREST $10.000 (183.686 → 180.000) and the total of the plan follows it
+// (monthly installment × months). It never rounds below what repays the capital, and a plan
 // without interest is left exact.
 export const INSTALLMENT_STEP = 10000;
 export function roundInstallment(exact, capitalPerPayment = 0) {
@@ -69,9 +69,14 @@ export function roundInstallment(exact, capitalPerPayment = 0) {
 export function financePlan(debt, ratePct, installments = 1, frequency = 'mensual') {
   const n = Math.max(1, Math.round(installments) || 1);
   const exactInterest = amortization(debt, ratePct, termMonths(n, frequency)).totalInterest;
-  if (!(debt > 0) || !(exactInterest > 0)) return { installments: n, installment: debt > 0 ? debt / n : 0, financed: Math.max(0, debt), interest: 0 };
-  const installment = roundInstallment((debt + exactInterest) / n, debt / n);
-  return { installments: n, installment, financed: installment * n, interest: installment * n - debt };
+  if (!(debt > 0) || !(exactInterest > 0)) return { installments: n, installment: debt > 0 ? debt / n : 0, monthly: 0, financed: Math.max(0, debt), interest: 0 };
+  // Always priced as the MONTHLY plan: the monthly installment is the one that gets rounded,
+  // and a fortnightly/weekly payment is just that monthly installment split in 2 / 4, so
+  // 12 fortnights cost exactly the same as 6 months.
+  const months = termMonths(n, frequency);
+  const monthly = roundInstallment((debt + exactInterest) / months, debt / months);
+  const financed = Math.round(monthly * months);
+  return { installments: n, installment: financed / n, monthly, financed, interest: financed - debt };
 }
 
 // Price of ONE product financed in n payments. The debt is the product's total cost
