@@ -14,34 +14,58 @@ export function formatCurrency(amount) {
   }).format(amount);
 }
 
-// Get Interest Rate by Client Type
-export function getInterestRateByClientType(type) {
-  const rates = {
-    'tipo-1': 10,
-    'tipo-2': 15,
-    'tipo-3': 20
-  };
-  return rates[type] || 10;
+// Monthly interest rate proposed on a new sale/quote. It is always editable there; the
+// client type is only a classification and no longer decides the rate.
+export const DEFAULT_INTEREST_RATE = 10;
+
+const parseRate = (ratePct) => (ratePct !== null && ratePct !== undefined && ratePct !== '' ? Math.max(0, parseFloat(ratePct) || 0) : DEFAULT_INTEREST_RATE);
+
+// Interest is always worked out per MONTH, whatever the payment frequency: the term in
+// months is  payments × months-per-payment  (6 fortnightly payments = 3 months), so a
+// fortnightly plan costs the same as the monthly one and each payment is just half the
+// monthly installment.
+const PERIOD_MONTHS = { mensual: 1, quincenal: 0.5, semanal: 0.25 };
+export const termMonths = (installments, frequency = 'mensual') =>
+  Math.max(1, (Math.max(1, Math.round(installments) || 1)) * (PERIOD_MONTHS[frequency] || 1));
+
+// Fixed-installment amortization, interest charged each month on the OUTSTANDING balance
+// (never on the original amount):
+//     C = P × i(1+i)^n / ((1+i)^n − 1)
+// Example: P = 2.030.000, i = 20%, n = 6  →  C ≈ 610.433.
+// Returns the monthly installment, totals and (for whole months) the full schedule; the
+// last payment absorbs the rounding so the balance ends at exactly 0.
+export function amortization(principal, ratePct, months) {
+  const P = Math.max(0, parseFloat(principal) || 0);
+  const i = parseRate(ratePct) / 100;
+  const m = Math.max(1, parseFloat(months) || 1);
+  const raw = i > 0 ? (P * (i * Math.pow(1 + i, m))) / (Math.pow(1 + i, m) - 1) : P / m;
+  const installment = Math.round(raw);
+  const rows = [];
+  if (Number.isInteger(m)) {
+    let balance = P;
+    for (let k = 1; k <= m; k++) {
+      const interest = Math.round(balance * i);
+      const principalPaid = k === m ? balance : Math.min(balance, Math.max(0, installment - interest));
+      rows.push({ n: k, opening: balance, interest, payment: principalPaid + interest, principal: principalPaid, closing: balance - principalPaid });
+      balance -= principalPaid;
+    }
+  }
+  const totalPaid = rows.length ? rows.reduce((a, r) => a + r.payment, 0) : Math.round(raw * m);
+  return { principal: P, ratePct: i * 100, months: m, installment, totalPaid, totalInterest: totalPaid - P, rows };
 }
 
-// Total interest factor for n installments. Interest accrues on the outstanding DEBT each
-// period: the debt is split into n equal shares, so the balance is n/n, (n-1)/n, … 1/n of it,
-// and the total interest over the term is  debt × rate × (n+1)/2.
-// Example (rate 10%, 5 installments): 10% × (5+4+3+2+1)/5 = 30% of the debt.
-export const interestFactor = (installments) => (Math.max(1, Math.round(installments) || 1) + 1) / 2;
-
-// Price of ONE product financed in n installments. The debt is the product's total cost
+// Price of ONE product financed in n payments. The debt is the product's total cost
 // (cost + extra expenses); the interest is added to it and the total is split into equal
-// installments. ratePct overrides the client-type default (e.g. a manually edited rate).
-export function calculateProductPricing(cost, extraExpensesPercent, clientType = 'tipo-1', installments = 1, ratePct = null) {
+// installments.
+export function calculateProductPricing(cost, extraExpensesPercent, ratePct = null, installments = 1, frequency = 'mensual') {
   const n = Math.max(1, Math.round(installments) || 1);
   const baseCost = parseFloat(cost) || 0;
   const extPct = parseFloat(extraExpensesPercent) || 0;
-  const intPct = ratePct !== null && ratePct !== undefined && ratePct !== '' ? parseFloat(ratePct) || 0 : getInterestRateByClientType(clientType);
+  const intPct = parseRate(ratePct);
 
   const extraExpensesAmount = baseCost * (extPct / 100);
   const debt = baseCost + extraExpensesAmount;
-  const interestAmount = debt * (intPct / 100) * interestFactor(n);
+  const interestAmount = amortization(debt, intPct, termMonths(n, frequency)).totalInterest;
   const finalPrice = Math.round(debt + interestAmount);
 
   return {
@@ -49,7 +73,7 @@ export function calculateProductPricing(cost, extraExpensesPercent, clientType =
     installments: n,
     debt,
     interestPercent: intPct,
-    interestTotalPercent: intPct * interestFactor(n),
+    interestTotalPercent: debt ? (interestAmount / debt) * 100 : 0,
     interestAmount,
     extraExpensesPercent: extPct,
     extraExpensesAmount,
@@ -58,16 +82,15 @@ export function calculateProductPricing(cost, extraExpensesPercent, clientType =
   };
 }
 
-// Prices a whole sale: the debt is what the client still owes after the down payment
-// (total cost − initial), the interest is charged on that debt and spread across the
-// items in proportion to their cost, so the item totals add up to exactly the sale total.
-export function repriceItems(items, clientType, installments = 1, initial = 0) {
+// Prices a whole sale/quote: the debt is what the client still owes after the down payment
+// (total cost − initial), the interest (ratePct per month) is charged on that debt and spread
+// across the items in proportion to their cost, so the item totals add up to exactly the total.
+export function repriceItems(items, ratePct, installments = 1, initial = 0, frequency = 'mensual') {
   if (!items.length) return items;
-  const rate = getInterestRateByClientType(clientType) / 100;
   const base = items.map((i) => (parseFloat(i.cost) || 0) * (1 + (parseFloat(i.extraExpensesPercent) || 0) / 100) * i.quantity);
   const baseSum = base.reduce((a, b) => a + b, 0);
   const debt = baseSum - Math.min(baseSum, Math.max(0, initial));
-  const interest = debt * rate * interestFactor(installments);
+  const interest = amortization(debt, ratePct, termMonths(installments, frequency)).totalInterest;
   const grand = Math.round(baseSum + interest);
   let allocated = 0;
   return items.map((item, idx) => {
@@ -77,6 +100,23 @@ export function repriceItems(items, clientType, installments = 1, initial = 0) {
     allocated += total;
     return { ...item, total, finalUnitPrice: total / (item.quantity || 1) };
   });
+}
+
+// What to show in the credit calculator for a sale/quote being built: the amount
+// financed (cost − down payment), the rate and the term in whole months.
+export function amortizationPrefill(items, ratePct, installments = 1, initial = 0, frequency = 'mensual') {
+  const baseSum = items.reduce((a, i) => a + (parseFloat(i.cost) || 0) * (1 + (parseFloat(i.extraExpensesPercent) || 0) / 100) * i.quantity, 0);
+  const debt = Math.round(baseSum - Math.min(baseSum, Math.max(0, initial)));
+  const months = termMonths(installments, frequency);
+  const perMonth = { quincenal: 2, semanal: 4 }[frequency];
+  return {
+    amount: debt || '',
+    rate: parseRate(ratePct),
+    months: Math.max(1, Math.round(months)),
+    note: perMonth
+      ? `Plan de ${installments} pagos ${frequency}es = ${months} ${months === 1 ? 'mes' : 'meses'}. El interés se calcula por mes; cada pago ${frequency} es la cuota mensual dividida entre ${perMonth}.`
+      : ''
+  };
 }
 // Toast Notification Toast Generator
 export function showToast(message, type = 'info') {

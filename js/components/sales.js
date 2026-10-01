@@ -7,7 +7,7 @@ import { db } from '../db.js';
 import { getSellers, getMyUsername } from '../permissions.js';
 import { paper, docBox, esc, fitPaper, exportPdfById, brand } from '../pdf-doc.js';
 import { effectiveStatus, installmentValue, nextDue, bogotaToday } from '../due.js';
-import { formatCurrency, formatDate, repriceItems, showToast, generateWhatsAppPaymentReceipt } from '../utils.js';
+import { formatCurrency, formatDate, repriceItems, showToast, generateWhatsAppPaymentReceipt, DEFAULT_INTEREST_RATE, termMonths, amortizationPrefill } from '../utils.js';
 
 let newSaleItems = [];
 
@@ -145,16 +145,21 @@ export function renderSales(container) {
               <input type="number" id="sale-initial" min="0" step="any" value="0" oninput="window.salesModule.onTermsChanged()" class="input-field w-full px-3 py-2 text-sm font-mono">
             </div>
             <div>
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">% Interés mensual</label>
+              <input type="number" id="sale-rate" min="0" step="any" value="${DEFAULT_INTEREST_RATE}" oninput="window.salesModule.onTermsChanged()" class="input-field w-full px-3 py-2 text-sm font-mono">
+            </div>
+            <div>
               <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Valor de cada cuota ($)</label>
               <input type="number" id="sale-inst-amount" min="0" step="any" placeholder="Automático" class="input-field w-full px-3 py-2 text-sm font-mono">
               <p id="sale-cuota-hint" class="text-[10px] mt-1" style="color: var(--text-muted);"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Número de Cuotas</label>              <input type="number" id="sale-installments" min="1" max="12" value="4" oninput="window.salesModule.onTermsChanged()" class="input-field w-full px-3 py-2 text-sm">
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Número de Cuotas</label>
+              <input type="number" id="sale-installments" min="1" max="48" value="4" oninput="window.salesModule.onTermsChanged()" class="input-field w-full px-3 py-2 text-sm">
             </div>
             <div>
               <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Frecuencia</label>
-              <select id="sale-frequency" class="input-field w-full px-3 py-2 text-sm">
+              <select id="sale-frequency" onchange="window.salesModule.onTermsChanged()" class="input-field w-full px-3 py-2 text-sm">
                 <option value="quincenal">Quincenal</option>
                 <option value="mensual" selected>Mensual</option>
                 <option value="semanal">Semanal</option>
@@ -184,7 +189,10 @@ export function renderSales(container) {
             <span class="text-xs font-semibold uppercase" style="color: var(--success);">TOTAL DE LA VENTA:</span>
             <span id="sale-total-display" class="text-2xl font-extrabold" style="color: var(--text-main);">$ 0</span>
           </div>
-          <p id="sale-financed-hint" class="text-xs text-right -mt-2" style="color: var(--text-muted);"></p>
+          <div class="flex flex-wrap items-center justify-between gap-2 -mt-2">
+            <button type="button" id="sale-amortization-btn" onclick="window.salesModule.openAmortization()" class="text-xs font-semibold flex items-center gap-1" style="color: var(--primary);"><i data-lucide="table" class="w-3.5 h-3.5"></i> Ver tabla de amortización</button>
+            <p id="sale-financed-hint" class="text-xs text-right" style="color: var(--text-muted);"></p>
+          </div>
 
           <div class="flex items-center justify-end gap-3 pt-2">
             <button type="button" onclick="window.salesModule.closeSaleModal()" class="btn-glass px-4 py-2 rounded-xl text-sm">Cancelar</button>
@@ -403,7 +411,9 @@ window.salesModule = {
     if (prefilledQuote) {
       document.getElementById('sale-installments').value = prefilledQuote.installmentsCount || 4;
       document.getElementById('sale-frequency').value = prefilledQuote.frequency || 'mensual';
-      
+      document.getElementById('sale-rate').value = prefilledQuote.interestRate ?? DEFAULT_INTEREST_RATE;
+      document.getElementById('sale-initial').value = prefilledQuote.initialPayment || 0;
+
       newSaleItems = prefilledQuote.items.map(item => ({ ...item }));
     }
 
@@ -431,9 +441,10 @@ window.salesModule = {
     return Math.max(1, parseInt(document.getElementById('sale-installments')?.value) || 1);
   },
 
-  // The interest is charged on the DEBT (total cost − down payment) and depends on the number
-  // of installments: reprice every item that has no manual price, then refresh the totals.
-  // A cash sale has no debt, so it carries no interest.
+  // The interest is charged on the DEBT (total cost − down payment) at the monthly rate typed
+  // in "% Interés mensual", over the term in months (payments × frequency): reprice every
+  // item that has no manual price, then refresh the totals. A cash sale has no debt, so it
+  // carries no interest.
   onTermsChanged() {
     const cash = document.getElementById('sale-type')?.value === 'contado';
     const client = db.getCollection('clients').find(c => c.id === document.getElementById('sale-client-id')?.value);
@@ -441,7 +452,9 @@ window.salesModule = {
     if (client && newSaleItems.length) {
       const auto = newSaleItems.filter(i => !i.customPrice);
       const initial = cash ? Infinity : (parseFloat(document.getElementById('sale-initial')?.value) || 0);
-      const repriced = repriceItems(auto, client.type, this.termInstallments(), initial);
+      const rate = document.getElementById('sale-rate')?.value;
+      const frequency = cash ? 'mensual' : (document.getElementById('sale-frequency')?.value || 'mensual');
+      const repriced = repriceItems(auto, rate, this.termInstallments(), initial, frequency);
       let k = 0;
       newSaleItems = newSaleItems.map(i => (i.customPrice ? i : repriced[k++]));
     }
@@ -468,6 +481,18 @@ window.salesModule = {
     this.renderItemsTable(true);
   },
 
+  // Month-by-month schedule for the amount being financed (cost − down payment).
+  openAmortization() {
+    if (document.getElementById('sale-type')?.value === 'contado') return showToast('Una venta de contado no tiene financiación', 'info');
+    window.creditCalc.open(amortizationPrefill(
+      newSaleItems.filter(i => !i.customPrice),
+      document.getElementById('sale-rate')?.value,
+      this.termInstallments(),
+      parseFloat(document.getElementById('sale-initial')?.value) || 0,
+      document.getElementById('sale-frequency')?.value || 'mensual'
+    ));
+  },
+
   saleTotals() {
     const total = newSaleItems.reduce((acc, i) => acc + i.total, 0);
     const cash = document.getElementById('sale-type')?.value === 'contado';
@@ -488,8 +513,11 @@ window.salesModule = {
     if (!t.cash) {
       const auto = newSaleItems.filter(i => !i.customPrice);
       const interest = auto.reduce((acc, i) => acc + i.total - i.cost * (1 + (i.extraExpensesPercent || 0) / 100) * i.quantity, 0);
-      if (interest > 0.5) interestNote = ' · Incluye interés ' + formatCurrency(interest);
-    }    if (fin) fin.textContent = t.cash ? '' : 'Cuota inicial ' + formatCurrency(t.initial) + ' · Financiado ' + formatCurrency(t.financed) + interestNote;
+      const months = termMonths(t.count, document.getElementById('sale-frequency')?.value || 'mensual');
+      const rate = parseFloat(document.getElementById('sale-rate')?.value) || 0;
+      if (interest > 0.5) interestNote = ` · Incluye interés ${formatCurrency(interest)} (${rate}% mensual sobre saldo, ${months} ${months === 1 ? 'mes' : 'meses'})`;
+    }
+    if (fin) fin.textContent = t.cash ? '' : 'Cuota inicial ' + formatCurrency(t.initial) + ' · Financiado ' + formatCurrency(t.financed) + interestNote;
   },
 
   setItemPrice(idx, value) {
@@ -515,7 +543,7 @@ window.salesModule = {
 
   addItem() {
     const clientId = document.getElementById('sale-client-id').value;
-    if (!clientId) return showToast('Selecciona el cliente primero para calcular su interés', 'warning');
+    if (!clientId) return showToast('Selecciona el cliente primero', 'warning');
 
     const clients = db.getCollection('clients');
     const client = clients.find(c => c.id === clientId);
@@ -627,6 +655,7 @@ window.salesModule = {
       outstandingBalance,
       installmentsCount: saleType === 'contado' ? 1 : installmentsCount,
       installmentAmount: saleType === 'contado' ? 0 : (customCuota || auto),
+      interestRate: saleType === 'contado' ? 0 : (parseFloat(document.getElementById('sale-rate')?.value) || 0),
       frequency,
       status: outstandingBalance === 0 ? 'pagado' : 'al_dia',
       date: today,

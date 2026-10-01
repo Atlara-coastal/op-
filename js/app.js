@@ -17,6 +17,7 @@ import { initAuth } from './auth.js';
 import { animateTabIn } from './animations.js';
 import { initPush } from './push.js';
 import './reminder.js';
+import './calculator.js';
 import { initSelects } from './select-enhance.js';
 import { initMobileUI } from './mobile-ui.js';
 import { canView, canEdit, firstAllowedTab, applyReadOnlyUI, isAdmin } from './permissions.js';

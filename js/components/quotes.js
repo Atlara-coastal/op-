@@ -4,7 +4,7 @@
  */
 
 import { db } from '../db.js';
-import { formatCurrency, formatDate, calculateProductPricing, getInterestRateByClientType, showToast } from '../utils.js';
+import { formatCurrency, formatDate, repriceItems, termMonths, amortizationPrefill, DEFAULT_INTEREST_RATE, showToast } from '../utils.js';
 import { paper, docBox, esc, fitPaper, exportPdfById, brand } from '../pdf-doc.js';
 
 let quoteSelectedItems = [];
@@ -22,9 +22,14 @@ export function renderQuotes(container) {
           <h1 class="text-2xl font-extrabold tracking-tight" style="color: var(--text-main);">Generador de Cotizaciones</h1>
           <p class="text-sm" style="color: var(--text-muted);">Crea cotizaciones personalizadas e imprímelas o conviértelas directamente en ventas a crédito.</p>
         </div>
-        <button onclick="window.quotesModule.openModal()" class="btn-primary px-5 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2">
-          <i data-lucide="file-plus" class="w-4.5 h-4.5"></i> Crear Cotización
-        </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="window.creditCalc.open()" class="btn-glass px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2">
+            <i data-lucide="calculator" class="w-4.5 h-4.5"></i> Calculadora de crédito
+          </button>
+          <button onclick="window.quotesModule.openModal()" class="btn-primary px-5 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2">
+            <i data-lucide="file-plus" class="w-4.5 h-4.5"></i> Crear Cotización
+          </button>
+        </div>
       </div>
 
       <!-- Quotes List -->
@@ -103,7 +108,7 @@ export function renderQuotes(container) {
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Nombre Prospecto</label>
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Nombre del cliente</label>
               <input type="text" id="quote-client-name" required placeholder="Ej: Diana Torres" class="input-field w-full px-3 py-2 text-sm">
             </div>
             <div>
@@ -114,16 +119,16 @@ export function renderQuotes(container) {
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Tipo Cliente (Interés)</label>
-              <select id="quote-client-type" onchange="window.quotesModule.onRateTypeChanged()" class="input-field w-full px-3 py-2 text-sm">
-                <option value="tipo-1">Tipo 1 (10% Interés)</option>
-                <option value="tipo-2">Tipo 2 (15% Interés)</option>
-                <option value="tipo-3">Tipo 3 (20% Interés)</option>
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Tipo de cliente (clasificación)</label>
+              <select id="quote-client-type" class="input-field w-full px-3 py-2 text-sm">
+                <option value="tipo-1">Frecuente / Excelente</option>
+                <option value="tipo-2">Primera Vez / Regular</option>
+                <option value="tipo-3">Riesgoso / Mora</option>
               </select>
             </div>
             <div>
-              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">% Interés (editable)</label>
-              <input type="number" id="quote-rate" min="0" step="0.5" value="10" oninput="window.quotesModule.updateClientType()" class="input-field w-full px-3 py-2 text-sm font-mono">
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">% Interés mensual</label>
+              <input type="number" id="quote-rate" min="0" step="any" value="${DEFAULT_INTEREST_RATE}" oninput="window.quotesModule.reprice()" class="input-field w-full px-3 py-2 text-sm font-mono">
             </div>
           </div>
 
@@ -164,33 +169,26 @@ export function renderQuotes(container) {
           </div>
 
           <!-- Installments & Terms -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Cuota Inicial ($)</label>
+              <input type="number" id="quote-initial" min="0" step="any" value="0" oninput="window.quotesModule.reprice()" class="input-field w-full px-3 py-2 text-sm font-mono">
+            </div>
             <div>
               <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Número de Cuotas</label>
-              <select id="quote-installments" onchange="window.quotesModule.updateClientType()" class="input-field w-full px-3 py-2 text-sm">
-                <option value="1">1 cuota</option>
-                <option value="2">2 cuotas</option>
-                <option value="3">3 cuotas</option>
-                <option value="4">4 cuotas</option>
-                <option value="5">5 cuotas</option>
-                <option value="6" selected>6 cuotas</option>
-                <option value="7">7 cuotas</option>
-                <option value="8">8 cuotas</option>
-                <option value="9">9 cuotas</option>
-                <option value="10">10 cuotas</option>
-                <option value="11">11 cuotas</option>
-                <option value="12">12 cuotas</option>
+              <select id="quote-installments" onchange="window.quotesModule.reprice()" class="input-field w-full px-3 py-2 text-sm">
+                ${Array.from({ length: 48 }, (_, i) => i + 1).map((n) => `<option value="${n}" ${n === 6 ? 'selected' : ''}>${n} ${n === 1 ? 'cuota' : 'cuotas'}</option>`).join('')}
               </select>
             </div>
             <div>
               <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Frecuencia de Pago</label>
-              <select id="quote-frequency" onchange="window.quotesModule.recalculateTotals()" class="input-field w-full px-3 py-2 text-sm">
+              <select id="quote-frequency" onchange="window.quotesModule.reprice()" class="input-field w-full px-3 py-2 text-sm">
                 <option value="semanal">Semanal</option>
                 <option value="quincenal">Quincenal</option>
                 <option value="mensual" selected>Mensual</option>
               </select>
             </div>
-            <div class="col-span-2 sm:col-span-1">
+            <div>
               <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Válida hasta</label>
               <input type="date" id="quote-valid-until" class="input-field w-full px-3 py-2 text-sm">
             </div>
@@ -206,6 +204,10 @@ export function renderQuotes(container) {
               <span class="text-xs font-semibold block" style="color: var(--success);">VALOR CUOTA ESTIMADA</span>
               <span id="quote-installment-val" class="text-xl font-bold" style="color: var(--success);">$ 0 / mes</span>
             </div>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-2 -mt-2">
+            <button type="button" onclick="window.quotesModule.openAmortization()" class="text-xs font-semibold flex items-center gap-1" style="color: var(--primary);"><i data-lucide="table" class="w-3.5 h-3.5"></i> Ver tabla de amortización</button>
+            <p id="quote-financed-hint" class="text-xs text-right" style="color: var(--text-muted);"></p>
           </div>
 
           <div class="flex items-center justify-end gap-3 pt-2">
@@ -260,29 +262,28 @@ window.quotesModule = {
     document.getElementById('quote-modal').classList.add('hidden');
   },
 
-  // Prefills the % Interés field with the type's default rate when the type changes
-  // (the field stays editable afterwards; typing in it never gets overwritten).
-  onRateTypeChanged() {
-    const clientType = document.getElementById('quote-client-type').value;
-    document.getElementById('quote-rate').value = getInterestRateByClientType(clientType);
-    this.updateClientType();
+  // Same pricing as a sale: the interest (monthly %, editable) is charged on what is left
+  // after the down payment, over the term in months (payments × frequency), and spread
+  // across the items. Runs whenever the rate, down payment, payments or frequency change.
+  terms() {
+    return {
+      rate: document.getElementById('quote-rate')?.value,
+      count: Math.max(1, parseInt(document.getElementById('quote-installments')?.value) || 1),
+      frequency: document.getElementById('quote-frequency')?.value || 'mensual',
+      initial: Math.max(0, parseFloat(document.getElementById('quote-initial')?.value) || 0)
+    };
   },
 
-  // Interest depends on the % Interés field (editable, defaults from the client type) and
-  // the number of installments: reprice every item.
-  updateClientType() {
-    const clientType = document.getElementById('quote-client-type').value;
-    const rate = document.getElementById('quote-rate')?.value;
-    const n = parseInt(document.getElementById('quote-installments')?.value) || 1;
-    quoteSelectedItems = quoteSelectedItems.map(item => {
-      const pricing = calculateProductPricing(item.cost, item.extraExpensesPercent, clientType, n, rate);
-      return {
-        ...item,
-        finalUnitPrice: pricing.finalPrice,
-        total: item.quantity * pricing.finalPrice
-      };
-    });
+  reprice() {
+    const t = this.terms();
+    quoteSelectedItems = repriceItems(quoteSelectedItems, t.rate, t.count, t.initial, t.frequency);
     this.renderItemsTable();
+  },
+
+  // Month-by-month schedule for the amount being financed (cost − down payment).
+  openAmortization() {
+    const t = this.terms();
+    window.creditCalc.open(amortizationPrefill(quoteSelectedItems, t.rate, t.count, t.initial, t.frequency));
   },
 
   addItem() {
@@ -293,33 +294,28 @@ window.quotesModule = {
     const prod = products.find(p => p.id === prodId);
     if (!prod) return;
 
-    const clientType = document.getElementById('quote-client-type').value;
-    const rate = document.getElementById('quote-rate')?.value;
-    const pricing = calculateProductPricing(prod.cost, prod.extraExpensesPercent, clientType, parseInt(document.getElementById('quote-installments')?.value) || 1, rate);
-
     const existing = quoteSelectedItems.find(i => i.productId === prodId);
     if (existing) {
       existing.quantity += 1;
-      existing.total = existing.quantity * existing.finalUnitPrice;
     } else {
       quoteSelectedItems.push({
         productId: prod.id,
         productName: prod.name,
         cost: prod.cost,
         extraExpensesPercent: prod.extraExpensesPercent,
-        finalUnitPrice: pricing.finalPrice,
+        finalUnitPrice: 0,
         quantity: 1,
-        total: pricing.finalPrice
+        total: 0
       });
     }
 
-    this.renderItemsTable();
+    this.reprice();
     showToast('Producto añadido a la cotización', 'info');
   },
 
   removeItem(index) {
     quoteSelectedItems.splice(index, 1);
-    this.renderItemsTable();
+    this.reprice();
   },
 
   renderItemsTable() {
@@ -348,15 +344,26 @@ window.quotesModule = {
     if (window.lucide) window.lucide.createIcons();
   },
 
-  recalculateTotals() {
+  // Total, down payment (never more than the total), financed amount and installment value.
+  totals() {
+    const t = this.terms();
     const totalAmount = quoteSelectedItems.reduce((acc, item) => acc + item.total, 0);
-    const count = parseInt(document.getElementById('quote-installments')?.value || 1);
-    const freq = document.getElementById('quote-frequency')?.value || 'mensual';
+    const initial = Math.min(totalAmount, t.initial);
+    const financed = totalAmount - initial;
+    return { ...t, totalAmount, initial, financed, installmentValue: financed / t.count };
+  },
 
-    const installmentVal = totalAmount > 0 ? (totalAmount / count) : 0;
-
-    document.getElementById('quote-total-amount').innerText = formatCurrency(totalAmount);
-    document.getElementById('quote-installment-val').innerText = `${formatCurrency(installmentVal)} / ${freq}`;
+  recalculateTotals() {
+    const t = this.totals();
+    document.getElementById('quote-total-amount').innerText = formatCurrency(t.totalAmount);
+    document.getElementById('quote-installment-val').innerText = `${formatCurrency(t.installmentValue)} / ${t.frequency}`;
+    const hint = document.getElementById('quote-financed-hint');
+    if (hint) {
+      const months = termMonths(t.count, t.frequency);
+      hint.textContent = t.totalAmount > 0
+        ? `Cuota inicial ${formatCurrency(t.initial)} · Financiado ${formatCurrency(t.financed)} · ${parseFloat(t.rate) || 0}% mensual sobre saldo, ${months} ${months === 1 ? 'mes' : 'meses'}`
+        : '';
+    }
   },
 
   saveQuote(e) {
@@ -367,12 +374,8 @@ window.quotesModule = {
 
     const clientName = document.getElementById('quote-client-name').value.trim();
     const clientPhone = document.getElementById('quote-client-phone').value.trim();
-    const installmentsCount = parseInt(document.getElementById('quote-installments').value);
-    const frequency = document.getElementById('quote-frequency').value;
     const validUntil = document.getElementById('quote-valid-until').value;
-
-    const totalAmount = quoteSelectedItems.reduce((acc, item) => acc + item.total, 0);
-    const installmentValue = totalAmount / installmentsCount;
+    const t = this.totals();
 
     const newQuote = {
       id: 'quote-' + Date.now(),
@@ -380,12 +383,13 @@ window.quotesModule = {
       clientName,
       clientPhone,
       items: quoteSelectedItems,
-      totalAmount,
-      installmentsCount,
-      installmentValue,
-      frequency,
+      totalAmount: t.totalAmount,
+      initialPayment: t.initial,
+      installmentsCount: t.count,
+      installmentValue: t.installmentValue,
+      frequency: t.frequency,
       clientType: document.getElementById('quote-client-type').value,
-      interestRate: parseFloat(document.getElementById('quote-rate')?.value) || 0,
+      interestRate: parseFloat(t.rate) || 0,
       validUntil,
       createdAt: new Date().toISOString()
     };
@@ -409,7 +413,7 @@ window.quotesModule = {
       footer: `Cotización válida hasta el ${formatDate(q.validUntil)}.<br>Sujeta a aprobación de cupo.`,
       body: `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          ${docBox('Cliente cotizado', `<div style="font-size:14px;font-weight:700;">${esc(q.clientName)}</div>
+          ${docBox('Cliente', `<div style="font-size:14px;font-weight:700;">${esc(q.clientName)}</div>
             <div style="color:#5b6b7f;margin-top:3px;">Tel: <b style="color:#0b1220;">${esc(q.clientPhone || 'No registrado')}</b></div>`)}
           ${docBox('Condiciones de crédito', `<div style="font-size:14px;font-weight:700;color:${brand().accent};">${q.installmentsCount} cuotas ${esc(q.frequency)}es</div>
             <div style="color:#5b6b7f;margin-top:3px;">Válida hasta: <b style="color:#0b1220;">${formatDate(q.validUntil)}</b></div>`, 'cyan')}
@@ -433,9 +437,10 @@ window.quotesModule = {
               </tr>`).join('')}
           </tbody>
         </table>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          ${docBox('Total plan de crédito', `<div style="font-size:22px;font-weight:800;font-family:'Courier New',monospace;">${formatCurrency(q.totalAmount)}</div>`)}
-          ${docBox('Valor de cada cuota', `<div style="font-size:22px;font-weight:800;font-family:'Courier New',monospace;color:#059669;">${formatCurrency(q.installmentValue)}</div><div style="color:#059669;font-size:10px;">por ${esc(q.frequency)}</div>`, 'ok')}
+        <div style="display:grid;grid-template-columns:repeat(${q.initialPayment > 0 ? 3 : 2},1fr);gap:12px;">
+          ${docBox('Total plan de crédito', `<div style="font-size:${q.initialPayment > 0 ? 18 : 22}px;font-weight:800;font-family:'Courier New',monospace;">${formatCurrency(q.totalAmount)}</div>`)}
+          ${q.initialPayment > 0 ? docBox('Cuota inicial', `<div style="font-size:18px;font-weight:800;font-family:'Courier New',monospace;">${formatCurrency(q.initialPayment)}</div>`) : ''}
+          ${docBox('Valor de cada cuota', `<div style="font-size:${q.initialPayment > 0 ? 18 : 22}px;font-weight:800;font-family:'Courier New',monospace;color:#059669;">${formatCurrency(q.installmentValue)}</div><div style="color:#059669;font-size:10px;">${q.installmentsCount} ${q.installmentsCount === 1 ? 'cuota' : 'cuotas'} ${esc(q.frequency)}${q.installmentsCount === 1 ? '' : 'es'}</div>`, 'ok')}
         </div>`
     });
     fitPaper(printContainer);

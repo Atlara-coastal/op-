@@ -44,7 +44,7 @@ export function renderClients(container) {
       <div class="glass-panel p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div class="relative w-full sm:w-80">
           <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3" style="color: var(--text-muted);"></i>
-          <input type="text" id="search-clients" placeholder="Buscar por nombre, CC o correo..." class="input-field w-full pl-9 pr-4 py-2 text-sm">
+          <input type="text" id="search-clients" placeholder="Buscar por nombre, CC, correo o lugar..." class="input-field w-full pl-9 pr-4 py-2 text-sm">
         </div>
 
         <div class="flex items-center gap-2 w-full sm:w-auto">
@@ -59,6 +59,9 @@ export function renderClients(container) {
             <option value="tipo-1">Frecuente / Excelente</option>
             <option value="tipo-2">Primera Vez / Regular</option>
             <option value="tipo-3">Riesgoso / Mora</option>
+          </select>
+          <select id="filter-client-place" onchange="window.clientsModule.filterClients()" title="Filtrar por lugar" class="input-field px-3 py-1.5 text-xs">
+            <option value="all">Todos los lugares</option>
           </select>
         </div>
       </div>
@@ -108,9 +111,16 @@ export function renderClients(container) {
             </div>
           </div>
 
-          <div>
-            <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Dirección de Residencia</label>
-            <input type="text" id="cli-address" placeholder="Calle 100 #15-20, Ciudad" class="input-field w-full px-3 py-2 text-sm">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Dirección de Residencia</label>
+              <input type="text" id="cli-address" placeholder="Calle 100 #15-20" class="input-field w-full px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Lugar (zona / municipio)</label>
+              <input type="text" id="cli-place" list="cli-place-list" autocomplete="off" placeholder="Ej: Barranquilla" class="input-field w-full px-3 py-2 text-sm">
+              <datalist id="cli-place-list"></datalist>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -206,22 +216,45 @@ export function renderClients(container) {
   if (window.lucide) window.lucide.createIcons();
 }
 
+// "Lugar" is a free-text classification (where the client is from). The filter and the
+// form's suggestions are rebuilt from the places already in use.
+const placesOf = (clients) => [...new Set(clients.map((c) => (c.place || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+
+function syncPlaceOptions(clients) {
+  const places = placesOf(clients);
+  const sel = document.getElementById('filter-client-place');
+  if (sel) {
+    const wanted = ['all', '__none__', ...places];
+    if (wanted.join('|') !== [...sel.options].map((o) => o.value).join('|')) {
+      const current = sel.value;
+      sel.innerHTML = `<option value="all">Todos los lugares</option><option value="__none__">Sin lugar</option>${places.map((p) => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}`;
+      sel.value = wanted.includes(current) ? current : 'all';
+    }
+  }
+  const list = document.getElementById('cli-place-list');
+  if (list) list.innerHTML = places.map((p) => `<option value="${esc(p)}">`).join('');
+}
+
 function renderCards() {
   const container = document.getElementById('clients-cards-grid');
   if (!container) return;
 
   const clients = db.getCollection('clients');
   const sales = db.getCollection('sales');
+  syncPlaceOptions(clients);
 
   const search = document.getElementById('search-clients')?.value.toLowerCase() || '';
   const typeFilter = document.getElementById('filter-client-type')?.value || 'all';
+  const placeFilter = document.getElementById('filter-client-place')?.value || 'all';
 
   const filtered = clients.filter(c => {
     const matchesSearch = c.fullName.toLowerCase().includes(search) ||
                           (c.cc || '').includes(search) ||
-                          (c.email && c.email.toLowerCase().includes(search));
+                          (c.email && c.email.toLowerCase().includes(search)) ||
+                          (c.place || '').toLowerCase().includes(search);
     const matchesType = typeFilter === 'all' || c.type === typeFilter;
-    return matchesSearch && matchesType;
+    const matchesPlace = placeFilter === 'all' || (placeFilter === '__none__' ? !(c.place || '').trim() : (c.place || '').trim() === placeFilter);
+    return matchesSearch && matchesType && matchesPlace;
   });
 
   if (filtered.length === 0) {
@@ -261,6 +294,7 @@ function renderCards() {
                 <th class="px-4 py-3">Cliente</th>
                 <th class="px-4 py-3">Calidad</th>
                 <th class="px-4 py-3">Teléfono</th>
+                <th class="px-4 py-3">Lugar</th>
                 <th class="px-4 py-3">Dirección</th>
                 <th class="px-4 py-3 text-right">Total compras</th>
                 <th class="px-4 py-3 text-right">Deuda actual</th>
@@ -275,7 +309,8 @@ function renderCards() {
                   <td class="px-4 py-3"><div class="font-bold" style="color: var(--text-main);">${c.fullName}</div><div class="text-[11px] font-mono">CC: ${c.cc || '—'}</div></td>
                   <td class="px-4 py-3">${getClientTypeBadgeHtml(c.type)}</td>
                   <td class="px-4 py-3 whitespace-nowrap">${c.phone || '—'}</td>
-                  <td class="px-4 py-3 text-xs max-w-[14rem] truncate">${c.address || '—'}</td>
+                  <td class="px-4 py-3 text-xs whitespace-nowrap">${c.place ? `<span class="px-2 py-0.5 rounded-full font-semibold" style="background: var(--primary-container); color: var(--primary);">${esc(c.place)}</span>` : '—'}</td>
+                  <td class="px-4 py-3 text-xs max-w-[11rem] truncate">${c.address || '—'}</td>
                   <td class="px-4 py-3 text-right font-mono" style="color: var(--text-main);">${formatCurrency(m.purchases)}</td>
                   <td class="px-4 py-3 text-right font-mono font-bold" style="color: ${m.debt > 0 ? 'var(--warning)' : 'var(--success)'};">${formatCurrency(m.debt)}</td>
                   <td class="px-4 py-3">
@@ -320,6 +355,9 @@ function renderCards() {
             </div>
             <div class="flex items-center gap-2">
               <i data-lucide="map-pin" class="w-3.5 h-3.5" style="color: var(--text-muted);"></i> ${c.address || 'Sin dirección'}
+            </div>
+            <div class="flex items-center gap-2">
+              <i data-lucide="map" class="w-3.5 h-3.5" style="color: var(--text-muted);"></i> Lugar: <strong style="color: var(--text-main);">${c.place ? esc(c.place) : 'Sin lugar'}</strong>
             </div>
             <div class="flex items-center gap-2">
               <i data-lucide="shield" class="w-3.5 h-3.5" style="color: var(--text-muted);"></i> Codeudor: <strong style="color: var(--text-main);">${c.codebtorName || 'Sin Codeudor'}</strong>
@@ -386,6 +424,7 @@ window.clientsModule = {
         document.getElementById('cli-phone').value = c.phone || '';
         document.getElementById('cli-age').value = c.age || '';
         document.getElementById('cli-address').value = c.address || '';
+        document.getElementById('cli-place').value = c.place || '';
         document.getElementById('cli-type').value = c.type || 'tipo-1';
         document.getElementById('cli-codebtor').value = c.codebtorId || '';
       }
@@ -414,6 +453,10 @@ window.clientsModule = {
     const phone = document.getElementById('cli-phone').value.trim();
     const age = parseInt(document.getElementById('cli-age').value) || null;
     const address = document.getElementById('cli-address').value.trim();
+    // Reuse the spelling of a place that already exists ("barranquilla" → "Barranquilla")
+    // so the same place never splits into two filter entries.
+    const typedPlace = document.getElementById('cli-place').value.trim().replace(/\s+/g, ' ');
+    const place = placesOf(db.getCollection('clients')).find((p) => p.toLowerCase() === typedPlace.toLowerCase()) || typedPlace || null;
     const type = document.getElementById('cli-type').value;
     const codebtorId = document.getElementById('cli-codebtor').value || null;
     const nextPaymentDate = document.getElementById('cli-next-pay').value || null;
@@ -433,14 +476,14 @@ window.clientsModule = {
 
     if (editingClientId) {
       db.updateItem('clients', editingClientId, {
-        fullName, cc, email, phone, age, address, type, codebtorId, codebtorName, nextPaymentDate, promisedAmount, sheetNote
+        fullName, cc, email, phone, age, address, place, type, codebtorId, codebtorName, nextPaymentDate, promisedAmount, sheetNote
       });
       showToast('Cliente actualizado correctamente', 'success');
     } else {
       savedClientId = 'cli-' + Date.now();
       const newClient = {
         id: savedClientId,
-        fullName, cc, email, phone, age, address, type, codebtorId, codebtorName, nextPaymentDate, promisedAmount, sheetNote,
+        fullName, cc, email, phone, age, address, place, type, codebtorId, codebtorName, nextPaymentDate, promisedAmount, sheetNote,
         createdAt: new Date().toISOString()
       };
       db.addItem('clients', newClient);
@@ -503,6 +546,7 @@ window.clientsModule = {
           <div><strong style="color: var(--text-main);">Correo:</strong> ${c.email || 'No registrado'}</div>
           <div><strong style="color: var(--text-main);">Teléfono:</strong> ${c.phone || 'No registrado'}</div>
           <div><strong style="color: var(--text-main);">Dirección:</strong> ${c.address || 'No registrada'}</div>
+          <div><strong style="color: var(--text-main);">Lugar:</strong> ${c.place ? esc(c.place) : 'No registrado'}</div>
           <div><strong style="color: var(--text-main);">Codeudor:</strong> ${c.codebtorName}</div>
         </div>
       </div>

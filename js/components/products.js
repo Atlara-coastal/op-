@@ -41,7 +41,7 @@ export function renderProducts(container) {
           </div>
         </div>
         <div class="text-xs px-3 py-2 rounded-lg" style="color: var(--text-muted); background: var(--bg-card-hover); border: 1px solid var(--border-color);">
-          * Esto es el costo total del producto, no el precio de venta. El precio final se calcula en la cotización sumando el % de Interés según el Tipo de Cliente.
+          * Esto es el costo total del producto, no el precio de venta. El precio final se calcula en la venta o cotización sumando el % de interés mensual por los meses del plazo.
         </div>
       </div>
 
