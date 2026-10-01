@@ -57,7 +57,7 @@ Reglas:
 // Calls Gemini with the fast model first; when that one is saturated, out of quota, retired
 // or too slow, the next one is tried. Returns the last response.
 const GEMINI_MODELS = [process.env.GEMINI_MODEL, 'gemini-flash-lite-latest', 'gemini-flash-latest'].filter(Boolean);
-async function gemini(key, body) {
+async function gemini(key, body, timeoutMs = 25000) {
   let last = { r: { ok: false, status: 504 }, data: { error: { message: 'sin respuesta' } } };
   for (const model of GEMINI_MODELS) {
     try {
@@ -65,7 +65,7 @@ async function gemini(key, body) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(25000)
+        signal: AbortSignal.timeout(timeoutMs)
       });
       last = { r, data: await r.json().catch(() => ({})) };
       if (r.ok) return last;
@@ -104,15 +104,69 @@ async function actionSpec(body) {
 }
 
 // ---- search: product photos from the web ------------------------------------------------
-// With GOOGLE_CSE_KEY + GOOGLE_CSE_CX it asks Google Images directly. Otherwise Gemini does
-// the search itself (Google Search tool) and the main picture of each page it finds is used,
-// so the Gemini key alone is enough.
+// Three sources, in this order:
+//   1. Google Images (GOOGLE_CSE_KEY + GOOGLE_CSE_CX) — Google no longer gives this API to
+//      new projects, so it only runs where those variables exist.
+//   2. Gemini searching Google by itself (GEMINI_SEARCH=1) — not part of Gemini's free plan.
+//   3. Free image banks (Openverse + Wikimedia Commons): no key, openly licensed pictures.
 async function actionSearch(body) {
   const q = text(body.q, 120);
   if (!q) throw new ApiError(400, 'Escribe qué buscar.');
   if (process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_CX) return cseSearch(q, process.env.GOOGLE_CSE_KEY, process.env.GOOGLE_CSE_CX);
-  if (process.env.GEMINI_API_KEY) return geminiSearch(q, process.env.GEMINI_API_KEY);
-  throw new ApiError(503, 'La búsqueda de imágenes todavía no está configurada: falta la clave GEMINI_API_KEY en Vercel.', 'not_configured');
+  if (process.env.GEMINI_SEARCH === '1' && process.env.GEMINI_API_KEY) return geminiSearch(q, process.env.GEMINI_API_KEY);
+  return openSearch(q);
+}
+
+// The image banks are indexed mostly in English: let the AI turn "puerta metálica" into
+// "metal door" first (falls back to the original text when the AI is not available).
+async function englishQuery(q) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return q;
+  const { r, data } = await gemini(key, {
+    contents: [{ role: 'user', parts: [{ text: `Traduce al inglés el tipo de objeto de este producto para buscar su foto en un banco de imágenes (1 a 3 palabras). No agregues adjetivos ni detalles que no estén en el nombre y quita marcas, referencias y medidas. Ejemplos: "Ventana" -> window; "Nevera Haceb 243 L No Frost" -> refrigerator; "Puerta metálica" -> metal door. Responde únicamente con la búsqueda.\n\nProducto: ${q}` }] }],
+    generationConfig: { temperature: 0 }
+  }, 5000);
+  const out = r.ok ? text((data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join(''), 60).replace(/["'.]/g, '') : '';
+  return out || q;
+}
+
+const OPEN_UA = 'ProductPhotoSearch/1.0 (credit sales app; contact via site owner)';
+
+async function openverse(q) {
+  const r = await fetch('https://api.openverse.org/v1/images/?' + new URLSearchParams({ q, page_size: '10', license_type: 'commercial', mature: 'false' }), { headers: { 'User-Agent': OPEN_UA }, signal: AbortSignal.timeout(9000) });
+  if (!r.ok) return [];
+  const data = await r.json();
+  return (data.results || []).filter((i) => /^https?:\/\//.test(i.url || '')).map((i) => ({
+    url: i.url,
+    thumb: i.thumbnail || i.url,
+    title: text(i.title, 120),
+    source: text(`${i.source || 'openverse'} · ${String(i.license || '').toUpperCase()}`, 80)
+  }));
+}
+
+async function wikimedia(q) {
+  const r = await fetch('https://commons.wikimedia.org/w/api.php?' + new URLSearchParams({
+    action: 'query', format: 'json', generator: 'search', gsrsearch: `${q} filetype:bitmap`, gsrnamespace: '6', gsrlimit: '10',
+    prop: 'imageinfo', iiprop: 'url|mime', iiurlwidth: '640'
+  }), { headers: { 'User-Agent': OPEN_UA }, signal: AbortSignal.timeout(9000) });
+  if (!r.ok) return [];
+  const data = await r.json();
+  return Object.values(data.query?.pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0)).map((p) => {
+    const info = p.imageinfo?.[0];
+    if (!info?.thumburl || !/^image\/(jpeg|png|webp)$/.test(info.mime || '')) return null;
+    return { url: info.thumburl, thumb: info.thumburl, title: text(String(p.title || '').replace(/^File:/, '').replace(/\.\w+$/, ''), 120), source: 'Wikimedia Commons' };
+  }).filter(Boolean);
+}
+
+async function openSearch(q) {
+  const en = await englishQuery(q);
+  const [a, b] = await Promise.all([openverse(en).catch(() => []), wikimedia(en).catch(() => [])]);
+  // alternate both banks so neither hides the other
+  const results = [];
+  for (let i = 0; i < Math.max(a.length, b.length) && results.length < 12; i++) {
+    for (const item of [a[i], b[i]]) if (item && results.length < 12 && !results.some((x) => x.url === item.url)) results.push(item);
+  }
+  return { results, query: en };
 }
 
 // The picture a page announces for itself when it is shared (Open Graph / Twitter card).
