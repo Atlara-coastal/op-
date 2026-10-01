@@ -25,6 +25,7 @@ const parseRate = (ratePct) => (ratePct !== null && ratePct !== undefined && rat
 // fortnightly plan costs the same as the monthly one and each payment is just half the
 // monthly installment.
 const PERIOD_MONTHS = { mensual: 1, quincenal: 0.5, semanal: 0.25 };
+export const paymentsPerMonth = (frequency) => ({ quincenal: 2, semanal: 4 }[frequency] || 1);
 export const termMonths = (installments, frequency = 'mensual') =>
   Math.max(1, (Math.max(1, Math.round(installments) || 1)) * (PERIOD_MONTHS[frequency] || 1));
 

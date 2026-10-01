@@ -7,7 +7,7 @@ import { db } from '../db.js';
 import { getSellers, getMyUsername } from '../permissions.js';
 import { paper, docBox, esc, fitPaper, exportPdfById, brand } from '../pdf-doc.js';
 import { effectiveStatus, installmentValue, nextDue, bogotaToday } from '../due.js';
-import { formatCurrency, formatDate, repriceItems, showToast, generateWhatsAppPaymentReceipt, DEFAULT_INTEREST_RATE, termMonths, amortizationPrefill } from '../utils.js';
+import { formatCurrency, formatDate, repriceItems, showToast, generateWhatsAppPaymentReceipt, DEFAULT_INTEREST_RATE, termMonths, paymentsPerMonth, amortizationPrefill } from '../utils.js';
 
 let newSaleItems = [];
 
@@ -154,7 +154,7 @@ export function renderSales(container) {
               <p id="sale-cuota-hint" class="text-[10px] mt-1" style="color: var(--text-muted);"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Número de Cuotas</label>
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Plazo (meses)</label>
               <input type="number" id="sale-installments" min="1" max="48" value="4" oninput="window.salesModule.onTermsChanged()" class="input-field w-full px-3 py-2 text-sm">
             </div>
             <div>
@@ -409,7 +409,7 @@ window.salesModule = {
     document.getElementById('sale-start-date').value = bogotaToday();
 
     if (prefilledQuote) {
-      document.getElementById('sale-installments').value = prefilledQuote.installmentsCount || 4;
+      document.getElementById('sale-installments').value = Math.max(1, Math.round(termMonths(prefilledQuote.installmentsCount || 4, prefilledQuote.frequency || 'mensual')));
       document.getElementById('sale-frequency').value = prefilledQuote.frequency || 'mensual';
       document.getElementById('sale-rate').value = prefilledQuote.interestRate ?? DEFAULT_INTEREST_RATE;
       document.getElementById('sale-initial').value = prefilledQuote.initialPayment || 0;
@@ -435,10 +435,13 @@ window.salesModule = {
     this.onTermsChanged();
   },
 
-  // Number of installments the interest is calculated for (cash = a single payment).
+  // Number of payments of the plan (cash = a single payment). The form asks for the term in
+  // MONTHS; the frequency only splits each monthly installment (quincenal = 2 payments per
+  // month, semanal = 4), so changing it never changes the interest or the total.
   termInstallments() {
     if (document.getElementById('sale-type')?.value === 'contado') return 1;
-    return Math.max(1, parseInt(document.getElementById('sale-installments')?.value) || 1);
+    const months = Math.max(1, parseInt(document.getElementById('sale-installments')?.value) || 1);
+    return months * paymentsPerMonth(document.getElementById('sale-frequency')?.value);
   },
 
   // The interest is charged on the DEBT (total cost − down payment) at the monthly rate typed
@@ -497,7 +500,7 @@ window.salesModule = {
     const total = newSaleItems.reduce((acc, i) => acc + i.total, 0);
     const cash = document.getElementById('sale-type')?.value === 'contado';
     const initial = cash ? total : Math.min(total, Math.max(0, parseFloat(document.getElementById('sale-initial')?.value) || 0));
-    const count = Math.max(1, parseInt(document.getElementById('sale-installments')?.value) || 1);
+    const count = this.termInstallments();
     const financed = total - initial;
     return { total, cash, initial, count, financed, auto: Math.round(financed / count) };
   },
@@ -508,7 +511,7 @@ window.salesModule = {
     const fin = document.getElementById('sale-financed-hint');
     const inst = document.getElementById('sale-inst-amount');
     if (inst) inst.placeholder = t.cash ? '' : 'Automático';
-    if (hint) hint.textContent = t.cash ? '' : 'Dejar vacío = ' + formatCurrency(t.auto);
+    if (hint) hint.textContent = t.cash ? '' : 'Dejar vacío = ' + formatCurrency(t.auto) + ' · ' + t.count + (t.count === 1 ? ' pago' : ' pagos ' + (document.getElementById('sale-frequency')?.value || 'mensual') + 'es');
     let interestNote = '';
     if (!t.cash) {
       const auto = newSaleItems.filter(i => !i.customPrice);
@@ -629,7 +632,7 @@ window.salesModule = {
     const client = clients.find(c => c.id === clientId);
 
     const saleType = document.getElementById('sale-type').value;
-    const installmentsCount = parseInt(document.getElementById('sale-installments').value) || 1;
+    const installmentsCount = this.termInstallments();
     const frequency = document.getElementById('sale-frequency').value;
     const startDate = document.getElementById('sale-start-date').value;
 

@@ -4,7 +4,7 @@
  */
 
 import { db } from '../db.js';
-import { formatCurrency, formatDate, repriceItems, termMonths, amortizationPrefill, DEFAULT_INTEREST_RATE, showToast } from '../utils.js';
+import { formatCurrency, formatDate, repriceItems, termMonths, paymentsPerMonth, amortizationPrefill, DEFAULT_INTEREST_RATE, showToast } from '../utils.js';
 import { paper, docBox, esc, fitPaper, exportPdfById, brand } from '../pdf-doc.js';
 
 let quoteSelectedItems = [];
@@ -175,9 +175,9 @@ export function renderQuotes(container) {
               <input type="number" id="quote-initial" min="0" step="any" value="0" oninput="window.quotesModule.reprice()" class="input-field w-full px-3 py-2 text-sm font-mono">
             </div>
             <div>
-              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Número de Cuotas</label>
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Plazo (meses)</label>
               <select id="quote-installments" onchange="window.quotesModule.reprice()" class="input-field w-full px-3 py-2 text-sm">
-                ${Array.from({ length: 48 }, (_, i) => i + 1).map((n) => `<option value="${n}" ${n === 6 ? 'selected' : ''}>${n} ${n === 1 ? 'cuota' : 'cuotas'}</option>`).join('')}
+                ${Array.from({ length: 48 }, (_, i) => i + 1).map((n) => `<option value="${n}" ${n === 6 ? 'selected' : ''}>${n} ${n === 1 ? 'mes' : 'meses'}</option>`).join('')}
               </select>
             </div>
             <div>
@@ -268,7 +268,8 @@ window.quotesModule = {
   terms() {
     return {
       rate: document.getElementById('quote-rate')?.value,
-      count: Math.max(1, parseInt(document.getElementById('quote-installments')?.value) || 1),
+      // The form asks for the term in MONTHS; count is the number of payments (quincenal = 2 per month, semanal = 4).
+      count: Math.max(1, parseInt(document.getElementById('quote-installments')?.value) || 1) * paymentsPerMonth(document.getElementById('quote-frequency')?.value),
       frequency: document.getElementById('quote-frequency')?.value || 'mensual',
       initial: Math.max(0, parseFloat(document.getElementById('quote-initial')?.value) || 0)
     };
@@ -361,7 +362,7 @@ window.quotesModule = {
     if (hint) {
       const months = termMonths(t.count, t.frequency);
       hint.textContent = t.totalAmount > 0
-        ? `Cuota inicial ${formatCurrency(t.initial)} · Financiado ${formatCurrency(t.financed)} · ${parseFloat(t.rate) || 0}% mensual sobre saldo, ${months} ${months === 1 ? 'mes' : 'meses'}`
+        ? `Cuota inicial ${formatCurrency(t.initial)} · Financiado ${formatCurrency(t.financed)} · ${parseFloat(t.rate) || 0}% mensual sobre saldo, ${months} ${months === 1 ? 'mes' : 'meses'} · ${t.count} ${t.count === 1 ? 'pago' : `pagos ${t.frequency}es`}`
         : '';
     }
   },
