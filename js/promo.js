@@ -3,7 +3,7 @@
  *   - an advertising image (photo, price, installments, brand colors), and
  *   - a technical sheet written by AI from the product name + the seller's comments,
  * both shareable as PNG. window.promoModule.open({ productId, quoteId }).
- * The photo can be uploaded, pasted as a link or searched on Google; photo, comments and
+ * The photo can be uploaded, pasted as a link or searched on the web; photo, comments and
  * sheet are saved on the product so they are only prepared once. The AI, the image
  * search and the photo storage run on the server (api/promo.js) to keep the keys private.
  */
@@ -294,11 +294,11 @@ window.promoModule = {
                 </div>
               </div>
               <div class="flex gap-2">
-                <input id="promo-q" type="text" placeholder="Buscar en Google…" class="${input}">
-                <button type="button" id="promo-search-btn" class="btn-glass px-3 py-2 rounded-xl text-xs font-semibold shrink-0 flex items-center gap-1.5"><i data-lucide="search" class="w-4 h-4"></i> Buscar en Google</button>
+                <input id="promo-q" type="text" placeholder="Buscar una foto en internet…" class="${input}">
+                <button type="button" id="promo-search-btn" class="btn-glass px-3 py-2 rounded-xl text-xs font-semibold shrink-0 flex items-center gap-1.5"><i data-lucide="search" class="w-4 h-4"></i> Buscar foto</button>
               </div>
               <div id="promo-results" class="grid grid-cols-4 gap-2"></div>
-              <p class="text-[10px]" style="color: var(--text-muted);">Las fotos de internet pueden tener derechos de autor: para publicidad lo más seguro es una foto propia o del fabricante.</p>
+              <p class="text-[10px]" style="color: var(--text-muted);">La búsqueda usa bancos de imágenes libres (Openverse y Wikimedia): son fotos genéricas, no de una marca o referencia exacta. Para la foto real del producto, súbela o pega su enlace.</p>
             </div>
 
             <div class="p-3 rounded-xl space-y-3" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
@@ -395,11 +395,11 @@ window.promoModule = {
       const box = $('promo-results');
       box.innerHTML = results.length
         ? results.map((r, i) => `<button type="button" data-result="${i}" title="${esc(r.title)} — ${esc(r.source)}" class="rounded-lg overflow-hidden" style="border: 1px solid var(--border-color); background: #fff; aspect-ratio: 1;"><img src="${esc(r.thumb)}" alt="" referrerpolicy="no-referrer" loading="lazy" style="width:100%;height:100%;object-fit:contain;display:block;"></button>`).join('')
-        : `<p class="col-span-4 text-xs" style="color: var(--text-muted);">Google no encontró imágenes para esa búsqueda.</p>`;
+        : `<p class="col-span-4 text-xs" style="color: var(--text-muted);">No se encontraron imágenes para esa búsqueda. Prueba con otra palabra o sube la foto.</p>`;
       box.querySelectorAll('[data-result]').forEach((b) => b.addEventListener('click', () => busy(b, '…', async () => {
         const r = results[Number(b.dataset.result)];
         let data;
-        // Some sites refuse the download: fall back to Google's own (smaller) preview.
+        // Some sites refuse the download: fall back to the (smaller) preview.
         try { data = (await api('image', { url: r.url })).dataUrl; } catch { data = (await api('image', { url: r.thumb })).dataUrl; }
         await usePhoto(data);
       })));
