@@ -54,6 +54,26 @@ export function amortization(principal, ratePct, months) {
   return { principal: P, ratePct: i * 100, months: m, installment, totalPaid, totalInterest: totalPaid - P, rows };
 }
 
+// Installments are charged in round figures: the exact installment goes to the NEAREST
+// $10.000 (183.686 → 180.000, 91.843 → 90.000) and the total of the plan follows it
+// (installment × payments). It never rounds below what repays the capital, and a plan
+// without interest is left exact.
+export const INSTALLMENT_STEP = 10000;
+export function roundInstallment(exact, capitalPerPayment = 0) {
+  const rounded = Math.round(exact / INSTALLMENT_STEP) * INSTALLMENT_STEP;
+  return rounded >= capitalPerPayment && rounded > 0 ? rounded : Math.ceil(exact / INSTALLMENT_STEP) * INSTALLMENT_STEP;
+}
+
+// Financing of a debt in n payments: monthly interest on the outstanding balance, then the
+// installment rounded as above. `interest` is what the plan really charges after rounding.
+export function financePlan(debt, ratePct, installments = 1, frequency = 'mensual') {
+  const n = Math.max(1, Math.round(installments) || 1);
+  const exactInterest = amortization(debt, ratePct, termMonths(n, frequency)).totalInterest;
+  if (!(debt > 0) || !(exactInterest > 0)) return { installments: n, installment: debt > 0 ? debt / n : 0, financed: Math.max(0, debt), interest: 0 };
+  const installment = roundInstallment((debt + exactInterest) / n, debt / n);
+  return { installments: n, installment, financed: installment * n, interest: installment * n - debt };
+}
+
 // Price of ONE product financed in n payments. The debt is the product's total cost
 // (cost + extra expenses); the interest is added to it and the total is split into equal
 // installments.
@@ -65,7 +85,7 @@ export function calculateProductPricing(cost, extraExpensesPercent, ratePct = nu
 
   const extraExpensesAmount = baseCost * (extPct / 100);
   const debt = baseCost + extraExpensesAmount;
-  const interestAmount = amortization(debt, intPct, termMonths(n, frequency)).totalInterest;
+  const interestAmount = financePlan(debt, intPct, n, frequency).interest;
   const finalPrice = Math.round(debt + interestAmount);
 
   return {
@@ -90,7 +110,7 @@ export function repriceItems(items, ratePct, installments = 1, initial = 0, freq
   const base = items.map((i) => (parseFloat(i.cost) || 0) * (1 + (parseFloat(i.extraExpensesPercent) || 0) / 100) * i.quantity);
   const baseSum = base.reduce((a, b) => a + b, 0);
   const debt = baseSum - Math.min(baseSum, Math.max(0, initial));
-  const interest = amortization(debt, ratePct, termMonths(installments, frequency)).totalInterest;
+  const interest = financePlan(debt, ratePct, installments, frequency).interest;
   const grand = Math.round(baseSum + interest);
   let allocated = 0;
   return items.map((item, idx) => {
@@ -113,6 +133,8 @@ export function amortizationPrefill(items, ratePct, installments = 1, initial = 
     amount: debt || '',
     rate: parseRate(ratePct),
     months: Math.max(1, Math.round(months)),
+    perMonth: perMonth || 1,
+    frequency,
     note: perMonth
       ? `Plan de ${installments} pagos ${frequency}es = ${months} ${months === 1 ? 'mes' : 'meses'}. El interés se calcula por mes; cada pago ${frequency} es la cuota mensual dividida entre ${perMonth}.`
       : ''

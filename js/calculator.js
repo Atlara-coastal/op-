@@ -4,7 +4,7 @@
  * window.creditCalc.open({ amount, rate, months, note }) shows the installment,
  * totals and the full amortization table; every input recalculates live.
  */
-import { amortization, formatCurrency, DEFAULT_INTEREST_RATE } from './utils.js';
+import { amortization, financePlan, formatCurrency, DEFAULT_INTEREST_RATE } from './utils.js';
 
 const num = (id) => parseFloat(document.getElementById(id)?.value) || 0;
 
@@ -26,9 +26,26 @@ function renderResult() {
       <div class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--text-muted);">${label}</div>
       <div class="text-lg font-extrabold font-mono mt-0.5" style="color: ${color};">${value}</div>
     </div>`;
+  // What is actually charged: the installment rounded to the nearest $10.000, per payment
+  // (a fortnightly plan has 2 payments per month).
+  const modal = document.getElementById('credit-calc-modal');
+  const frequency = modal?.dataset.frequency || 'mensual';
+  const plan = financePlan(amount, rateRaw === '' ? 0 : rateRaw, months * (parseInt(modal?.dataset.perMonth) || 1), frequency);
+  const rounded = plan.interest > 0 ? `
+    <div class="p-3 rounded-xl flex flex-wrap items-center justify-between gap-x-4 gap-y-1" style="background: var(--success-bg); border: 1px solid var(--success);">
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--success);">Cuota a cobrar (redondeada)</div>
+        <div class="text-2xl font-extrabold font-mono" style="color: var(--text-main);">${formatCurrency(plan.installment)} <span class="text-xs font-semibold" style="color: var(--text-muted);">${frequency}</span></div>
+      </div>
+      <div class="text-xs text-right" style="color: var(--text-muted);">
+        ${plan.installments} ${plan.installments === 1 ? 'pago' : 'pagos'} · Total <b style="color: var(--text-main);">${formatCurrency(plan.financed)}</b><br>
+        Intereses <b style="color: var(--warning);">${formatCurrency(plan.interest)}</b>
+      </div>
+    </div>` : '';
   out.innerHTML = `
+    ${rounded}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      ${stat('Cuota mensual', formatCurrency(a.installment), 'var(--primary)')}
+      ${stat('Cuota mensual exacta', formatCurrency(a.installment), 'var(--primary)')}
       ${stat('Total pagado', formatCurrency(a.totalPaid), 'var(--text-main)')}
       ${stat('Total de intereses', formatCurrency(a.totalInterest), 'var(--warning)')}
     </div>
@@ -57,16 +74,18 @@ function renderResult() {
         </tbody>
       </table>
     </div>
-    <p class="text-[11px]" style="color: var(--text-muted);">El interés de cada mes se calcula sobre el saldo pendiente del mes anterior. La última cuota se ajusta por redondeo para que el saldo quede en $ 0.</p>`;
+    <p class="text-[11px]" style="color: var(--text-muted);">El interés de cada mes se calcula sobre el saldo pendiente del mes anterior. La última cuota se ajusta por redondeo para que el saldo quede en $ 0. La tabla muestra el cálculo exacto; la cuota que se cobra se redondea a los $ 10.000 más cercanos.</p>`;
 }
 
 window.creditCalc = {
-  open({ amount = '', rate = DEFAULT_INTEREST_RATE, months = 6, note = '' } = {}) {
+  open({ amount = '', rate = DEFAULT_INTEREST_RATE, months = 6, note = '', perMonth = 1, frequency = 'mensual' } = {}) {
     close();
     const field = 'block text-xs font-semibold mb-1';
     const input = 'input-field w-full px-3 py-2 text-sm font-mono';
     const wrap = document.createElement('div');
     wrap.id = 'credit-calc-modal';
+    wrap.dataset.perMonth = perMonth;
+    wrap.dataset.frequency = frequency;
     wrap.className = 'fixed inset-0 z-[80] modal-overlay flex items-center justify-center p-4';
     wrap.innerHTML = `
       <div class="glass-panel w-full max-w-3xl p-5 space-y-4 animate-fade-in shadow-2xl relative max-h-[90vh] overflow-y-auto">
