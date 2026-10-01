@@ -3,7 +3,7 @@
  * Provides offline caching and mobile PWA installability
  */
 
-const CACHE_NAME = 'op-cache-v8';
+const CACHE_NAME = 'op-cache-v9';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -27,6 +27,7 @@ const ASSETS_TO_CACHE = [
   './js/reminder.js',
   './js/calculator.js',
   './js/promo.js',
+  './js/cutout.js',
   './js/components/collections.js',
   './js/due.js',
   './js/components/dashboard.js',

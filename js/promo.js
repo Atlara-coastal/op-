@@ -1,22 +1,37 @@
 /**
  * Publicidad y ficha técnica: for a product (alone or from a quote) builds
- *   - an advertising image (photo, price, installments, brand colors), and
- *   - a technical sheet written by AI from the product name + the seller's comments,
- * both shareable as PNG. window.promoModule.open({ productId, quoteId }).
- * The photo can be uploaded, pasted as a link or searched on the web; photo, comments and
- * sheet are saved on the product so they are only prepared once. The AI, the image
- * search and the photo storage run on the server (api/promo.js) to keep the keys private.
+ *   - an advertising image: the product cut out of its photo over a gradient, big
+ *     lettering, price and installments. The AI is the art director (headline, ribbon,
+ *     colors, lettering) and receives the whole credit plan; the amounts are always
+ *     printed from the real numbers, never written by the AI;
+ *   - a technical sheet written by AI from the product name + the seller's comments.
+ * Both are shareable as PNG. window.promoModule.open({ productId, quoteId }).
+ * The photo can be uploaded or taken from a link (a picture or a product page); photo,
+ * comments, sheet and ad design are saved on the product so they are prepared only once.
+ * The AI texts and the photo storage run on the server (api/promo.js) to keep the keys
+ * private; the background removal runs in the browser (js/cutout.js).
  */
 import { db } from './db.js';
 import { supabase } from './supabase-client.js';
 import { canEdit } from './permissions.js';
 import { paper, esc, fitPaper, exportImage, brand, brandLogo, BRAND_NAME } from './pdf-doc.js';
-import { formatCurrency, formatDate, calculateProductPricing, showToast } from './utils.js';
+import { formatCurrency, formatDate, financePlan, paymentsPerMonth, termMonths, DEFAULT_INTEREST_RATE, showToast } from './utils.js';
+import { removeBackground } from './cutout.js';
 
 const CONTACT_KEY = 'promo_contact';
+const CUTOUT_KEY = 'promo_cutout';
 const FONT = "'Outfit','Inter',Arial,sans-serif";
 
+// Lettering the AI (or the user) can pick for the ad.
+const FONTS = {
+  impacto: { label: 'Impacto', css: "'Anton','Outfit',Arial,sans-serif", weight: 400, upper: true, load: "400 60px 'Anton'" },
+  redonda: { label: 'Redonda', css: "'Baloo 2','Outfit',Arial,sans-serif", weight: 800, upper: false, load: "800 60px 'Baloo 2'" },
+  elegante: { label: 'Elegante', css: "'Playfair Display',Georgia,serif", weight: 900, upper: false, load: "900 60px 'Playfair Display'" }
+};
+const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Anton&family=Baloo+2:wght@800&family=Playfair+Display:wght@900&display=swap';
+
 let st = null;
+let lastCut = { src: null, result: null };
 
 const $ = (id) => document.getElementById(id);
 const lines = (text) => String(text || '').split('\n').map((l) => l.replace(/^[\s•✓*-]+/, '').trim()).filter(Boolean);
@@ -25,6 +40,27 @@ const specRows = (text) => lines(text).map((l) => {
   return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : ['', l];
 }).filter((r) => r[1]);
 const cssUrl = (u) => `url('${String(u).replace(/'/g, '%27')}')`;
+const isHex = (v) => /^#[0-9a-f]{6}$/i.test(v || '');
+
+// Relative luminance → readable text color on top of a background color.
+function luminance(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+const inkOn = (...colors) => (colors.reduce((a, c) => a + luminance(c), 0) / colors.length > 0.4 ? '#0b1220' : '#ffffff');
+
+async function ensureFonts() {
+  if (!document.getElementById('promo-fonts')) {
+    const link = document.createElement('link');
+    link.id = 'promo-fonts';
+    link.rel = 'stylesheet';
+    link.href = FONTS_HREF;
+    document.head.appendChild(link);
+    await new Promise((ok) => { link.onload = ok; link.onerror = ok; });
+  }
+  await Promise.all(Object.values(FONTS).map((f) => document.fonts.load(f.load).catch(() => {})));
+}
 
 async function api(action, payload = {}) {
   if (!supabase) throw new Error('Esta función necesita conexión con la nube.');
@@ -84,29 +120,59 @@ function photoBox(s, height, radius) {
 }
 
 function adHtml(s) {
-  const b = brand();
-  const feats = lines(s.features).slice(0, 4);
-  return `<div style="width:640px;box-sizing:border-box;background:#050708;color:#ffffff;font-family:${FONT};">
-    <div style="padding:22px 28px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+  const from = isHex(s.colorFrom) ? s.colorFrom : '#0b1020';
+  const to = isHex(s.colorTo) ? s.colorTo : brand().accent;
+  const accent = isHex(s.accent) ? s.accent : '#facc15';
+  const f = FONTS[s.font] || FONTS.impacto;
+  const ink = inkOn(from, to);
+  const light = ink === '#ffffff';
+  const soft = light ? 'rgba(255,255,255,.8)' : 'rgba(11,18,32,.72)';
+  const chip = light ? 'rgba(255,255,255,.16)' : 'rgba(11,18,32,.08)';
+  const onAccent = inkOn(accent);
+  // the accent only marks the ticks when it stands out from the background
+  const check = Math.abs(luminance(accent) - (luminance(from) + luminance(to)) / 2) > 0.3 ? accent : ink;
+  const headline = (s.headline || s.title || '').trim();
+  const size = headline.length <= 12 ? 68 : headline.length <= 20 ? 56 : headline.length <= 30 ? 46 : 38;
+  const display = `font-family:${f.css};font-weight:${f.weight};${f.upper ? 'text-transform:uppercase;letter-spacing:.01em;' : 'letter-spacing:-.01em;'}`;
+  const bullets = (lines(s.bullets).length ? lines(s.bullets) : lines(s.features)).slice(0, 3);
+  const cut = s.useCutout && s.cutout;
+
+  const product = cut
+    ? `<div style="position:relative;height:370px;margin:10px 28px 0;">
+        <div style="position:absolute;left:50%;top:50%;width:520px;height:520px;margin:-260px 0 0 -260px;background:radial-gradient(circle closest-side, rgba(255,255,255,.28) 0%, rgba(255,255,255,0) 100%);"></div>
+        <div style="position:absolute;left:0;right:0;top:0;bottom:6px;background-image:${cssUrl(s.cutout.dataUrl)};background-size:contain;background-position:center bottom;background-repeat:no-repeat;"></div>
+      </div>`
+    : `<div style="margin:16px 28px 0;">${photoBox(s, 320, 22)}</div>`;
+
+  return `<div style="position:relative;width:640px;box-sizing:border-box;overflow:hidden;background:linear-gradient(150deg, ${from} 0%, ${to} 100%);color:${ink};font-family:${FONT};">
+    <div style="position:absolute;right:-160px;top:-160px;width:460px;height:460px;background:radial-gradient(circle closest-side, ${accent}66 0%, ${accent}00 100%);"></div>
+    <div style="position:absolute;left:-180px;bottom:100px;width:460px;height:460px;background:radial-gradient(circle closest-side, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 100%);"></div>
+
+    <div style="position:relative;padding:22px 28px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <img src="${brandLogo()}" width="40" height="40" style="border-radius:10px;display:block;" alt="">
-        <div style="font-size:20px;font-weight:800;letter-spacing:-.02em;">${BRAND_NAME}</div>
+        <img src="${brandLogo()}" width="38" height="38" style="border-radius:10px;display:block;" alt="">
+        <div style="font-size:19px;font-weight:800;letter-spacing:-.02em;">${BRAND_NAME}</div>
       </div>
-      <div style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#050708;background:${b.bright};padding:6px 14px 10px;border-radius:999px;">Llévalo a crédito</div>
+      ${s.badge ? `<div style="${display}font-size:17px;color:${onAccent};background:${accent};padding:7px 16px 10px;border-radius:10px;transform:rotate(-3deg);">${esc(s.badge)}</div>` : ''}
     </div>
-    <div style="padding:0 28px;">${photoBox(s, 360, 22)}</div>
-    <div style="padding:22px 28px 8px;">
-      <div style="font-size:30px;font-weight:800;line-height:1.12;letter-spacing:-.02em;">${esc(s.title)}</div>
-      ${s.tagline ? `<div style="font-size:15px;color:#cbd5e1;margin-top:6px;">${esc(s.tagline)}</div>` : ''}
-      ${feats.length ? `<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">${feats.map((f) => `<div style="font-size:12px;font-weight:600;color:#e2e8f0;border:1px solid #334155;border-radius:999px;padding:5px 12px 9px;"><span style="color:${b.bright};font-weight:800;">✓</span> ${esc(f)}</div>`).join('')}</div>` : ''}
+
+    <div style="position:relative;padding:18px 28px 0;">
+      <div style="${display}font-size:${size}px;line-height:1.08;${light ? 'text-shadow:0 4px 0 rgba(0,0,0,.22);' : ''}">${esc(headline)}</div>
+      ${s.tagline ? `<div style="font-size:17px;font-weight:600;color:${soft};margin-top:10px;">${esc(s.tagline)}</div>` : ''}
     </div>
-    <div style="margin:14px 28px 0;border-radius:20px;padding:18px 22px;background:linear-gradient(135deg,${b.accent},${b.bright});color:#050708;">
-      ${s.price ? `<div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.75;">Precio a crédito</div>
-      <div style="font-size:40px;font-weight:800;letter-spacing:-.02em;margin-top:-4px;">${esc(s.price)}</div>` : ''}
-      ${s.plan ? `<div style="margin-top:${s.price ? 20 : 0}px;"><div style="display:inline-block;font-size:14px;font-weight:700;background:#050708;color:#ffffff;border-radius:999px;padding:6px 16px 10px;">${esc(s.plan)}</div></div>` : ''}
+
+    <div style="position:relative;">${product}</div>
+
+    ${bullets.length ? `<div style="position:relative;padding:14px 28px 0;display:flex;flex-wrap:wrap;gap:8px;">${bullets.map((b) => `<div style="font-size:13px;font-weight:700;background:${chip};border-radius:999px;padding:6px 14px 10px;"><span style="color:${check};">✓</span> ${esc(b)}</div>`).join('')}</div>` : ''}
+
+    <div style="position:relative;margin:16px 28px 0;border-radius:22px;padding:16px 22px 20px;background:${accent};color:${onAccent};">
+      ${s.price ? `<div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;opacity:.8;">Precio a crédito</div>
+      <div style="${display}font-size:58px;line-height:1.2;margin-top:-6px;">${esc(s.price)}</div>` : ''}
+      ${s.plan ? `<div style="margin-top:${s.price ? 26 : 0}px;"><div style="display:inline-block;font-size:15px;font-weight:800;background:${onAccent};color:${accent};border-radius:999px;padding:7px 18px 11px;">${esc(s.plan)}</div></div>` : ''}
     </div>
-    <div style="padding:16px 28px 22px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;font-size:11px;color:#94a3b8;">
-      <div style="font-size:13px;font-weight:700;color:#ffffff;">${esc(s.contact)}</div>
+
+    <div style="position:relative;padding:16px 28px 22px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;font-size:11px;color:${soft};">
+      <div style="font-size:14px;font-weight:800;color:${ink};">${esc(s.contact)}</div>
       <div style="text-align:right;">Sujeto a aprobación de crédito</div>
     </div>
   </div>`;
@@ -145,44 +211,82 @@ function sheetHtml(s) {
   });
 }
 
-// ---- state -----------------------------------------------------------------------------
-function planDefaults(product, quote) {
-  const fc = formatCurrency;
-  if (quote && (quote.items || []).some((i) => i.productId === product.id)) {
-    const n = quote.installmentsCount || 1;
-    const names = quote.items.map((i) => (i.quantity > 1 ? `${i.quantity} ${i.productName}` : i.productName));
-    return {
-      title: names.length > 1 ? names.join(' + ') : product.name,
-      price: fc(quote.totalAmount),
-      plan: `${quote.initialPayment > 0 ? `Inicial ${fc(quote.initialPayment)} · ` : ''}${n} ${n === 1 ? 'cuota' : 'cuotas'} ${quote.frequency || 'mensual'}${n === 1 ? '' : 'es'} de ${fc(quote.installmentValue)}`
-    };
-  }
-  const p = calculateProductPricing(product.cost, product.extraExpensesPercent, null, 6, 'mensual');
-  return { title: product.name, price: fc(p.finalPrice), plan: `6 cuotas mensuales de ${fc(p.installmentValue)}` };
+// ---- credit plan -----------------------------------------------------------------------
+// What is being financed: the quote's items when the product belongs to it, else the product.
+function planItems(product, quote) {
+  return quote && (quote.items || []).some((i) => i.productId === product.id)
+    ? quote.items
+    : [{ productName: product.name, cost: product.cost, extraExpensesPercent: product.extraExpensesPercent, quantity: 1 }];
 }
 
+// Same pricing as a sale: interest on what is left after the down payment, term in months,
+// the frequency only splits the monthly installment.
+function computePlan(s) {
+  const base = s.items.reduce((a, i) => a + (parseFloat(i.cost) || 0) * (1 + (parseFloat(i.extraExpensesPercent) || 0) / 100) * (i.quantity || 1), 0);
+  const initial = Math.min(base, Math.max(0, parseFloat(s.initial) || 0));
+  const months = Math.max(1, parseInt(s.months) || 1);
+  const count = months * paymentsPerMonth(s.frequency);
+  const fp = financePlan(base - initial, s.rate, count, s.frequency);
+  return { base, initial, months, count, rate: parseFloat(s.rate) || 0, frequency: s.frequency, installment: fp.installment, total: Math.round(base + fp.interest) };
+}
+
+function applyPlan() {
+  const p = computePlan(st);
+  st.price = formatCurrency(p.total);
+  st.plan = `${p.initial > 0 ? `Inicial ${formatCurrency(p.initial)} · ` : ''}${p.count} ${p.count === 1 ? 'cuota' : 'cuotas'} ${p.frequency}${p.count === 1 ? '' : 'es'} de ${formatCurrency(p.installment)}`;
+  ['price', 'plan'].forEach((k) => { const el = $('promo-' + k); if (el) el.value = st[k]; });
+  const hint = $('promo-plan-hint');
+  if (hint) hint.textContent = `Costo ${formatCurrency(p.base)} · Total a crédito ${formatCurrency(p.total)} · ${p.count} ${p.count === 1 ? 'pago' : 'pagos'} de ${formatCurrency(p.installment)}`;
+  return p;
+}
+
+// ---- state -----------------------------------------------------------------------------
 function stateFor(product, quote) {
   const spec = product.spec || {};
+  const ad = product.adDesign || {};
+  const items = planItems(product, quote);
+  const fromQuote = items === quote?.items;
+  const names = items.map((i) => ((i.quantity || 1) > 1 ? `${i.quantity} ${i.productName}` : i.productName));
+  const frequency = (fromQuote && quote.frequency) || 'mensual';
+  const read = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
   return {
     productId: product.id,
     quote,
+    items,
     category: product.category || '',
+    title: fromQuote && names.length > 1 ? names.join(' + ') : product.name,
     imageUrl: product.imageUrl || '',
     imageData: null,
+    cutout: null,
+    useCutout: read(CUTOUT_KEY, '1') === '1',
     notes: product.promoNotes || '',
     tagline: spec.tagline || '',
     features: (spec.features || []).join('\n'),
     specs: (spec.specs || []).map(([l, v]) => (l ? `${l}: ${v}` : v)).join('\n'),
-    contact: (() => { try { return localStorage.getItem(CONTACT_KEY) || ''; } catch { return ''; } })(),
+    contact: read(CONTACT_KEY, ''),
     tab: st?.tab || 'ad',
-    ...planDefaults(product, quote)
+    // credit plan (prefilled from the quote)
+    initial: fromQuote ? quote.initialPayment || 0 : 0,
+    rate: fromQuote ? quote.interestRate ?? DEFAULT_INTEREST_RATE : DEFAULT_INTEREST_RATE,
+    months: fromQuote ? Math.max(1, Math.round(termMonths(quote.installmentsCount || 1, frequency))) : 6,
+    frequency,
+    price: '',
+    plan: '',
+    // ad design (AI or manual)
+    headline: ad.headline || (fromQuote && names.length > 1 ? names.join(' + ') : product.name),
+    badge: ad.badge ?? 'Llévalo a crédito',
+    bullets: (ad.bullets || []).join('\n'),
+    colorFrom: isHex(ad.colorFrom) ? ad.colorFrom : '#0b1020',
+    colorTo: isHex(ad.colorTo) ? ad.colorTo : brand().accent,
+    accent: isHex(ad.accent) ? ad.accent : '#facc15',
+    font: FONTS[ad.font] ? ad.font : 'impacto'
   };
 }
 
-// Photo, comments and sheet live on the product (needs permission to edit the catalog).
+// Photo, comments, sheet and ad design live on the product (needs permission to edit the catalog).
 function persist(silent = true) {
   if (!st) return;
-  try { localStorage.setItem(CONTACT_KEY, st.contact || ''); } catch { /* private mode */ }
+  try { localStorage.setItem(CONTACT_KEY, st.contact || ''); localStorage.setItem(CUTOUT_KEY, st.useCutout ? '1' : '0'); } catch { /* private mode */ }
   if (!canEdit('products')) {
     if (!silent) showToast('No tienes permiso para guardar en el catálogo; puedes compartir la imagen igual.', 'warning');
     return;
@@ -190,7 +294,8 @@ function persist(silent = true) {
   db.updateItem('products', st.productId, {
     imageUrl: st.imageUrl || '',
     promoNotes: st.notes || '',
-    spec: { tagline: st.tagline || '', features: lines(st.features), specs: specRows(st.specs) }
+    spec: { tagline: st.tagline || '', features: lines(st.features), specs: specRows(st.specs) },
+    adDesign: { headline: st.headline || '', badge: st.badge || '', bullets: lines(st.bullets), colorFrom: st.colorFrom, colorTo: st.colorTo, accent: st.accent, font: st.font }
   });
   if (!silent) showToast('Guardado en el producto', 'success');
 }
@@ -207,12 +312,30 @@ function renderPreview() {
   });
 }
 
+const FIELDS = ['headline', 'badge', 'tagline', 'bullets', 'notes', 'features', 'specs', 'price', 'plan', 'contact', 'initial', 'rate', 'months', 'frequency', 'colorFrom', 'colorTo', 'accent', 'font'];
+const PLAN_FIELDS = ['initial', 'rate', 'months', 'frequency'];
+
 function fillForm() {
-  ['title', 'tagline', 'notes', 'features', 'specs', 'price', 'plan', 'contact'].forEach((k) => { const el = $('promo-' + k); if (el) el.value = st[k] || ''; });
-  const q = $('promo-q');
-  if (q) q.value = db.getCollection('products').find((p) => p.id === st.productId)?.name || '';
-  const results = $('promo-results');
-  if (results) results.innerHTML = '';
+  FIELDS.forEach((k) => { const el = $('promo-' + k); if (el) el.value = st[k] ?? ''; });
+  const cut = $('promo-cutout');
+  if (cut) cut.checked = st.useCutout;
+}
+
+function cutStatus(text) { const el = $('promo-cutout-status'); if (el) el.textContent = text; }
+
+// Cuts the product out of the current photo (AI model in the browser, see js/cutout.js).
+async function updateCutout() {
+  if (!st || !st.imageData || !st.useCutout) { cutStatus(''); return; }
+  const src = st.imageData;
+  if (lastCut.src === src) { st.cutout = lastCut.result; cutStatus(st.cutout ? 'Fondo quitado.' : 'No se pudo recortar esta foto: se muestra completa.'); renderPreview(); return; }
+  cutStatus('Quitando el fondo con IA… (la primera vez tarda un poco más)');
+  let result = null;
+  try { result = await removeBackground(src); } catch (e) { console.error(e); }
+  lastCut = { src, result };
+  if (!st || st.imageData !== src) return;
+  st.cutout = result;
+  cutStatus(result ? 'Fondo quitado.' : 'No se pudo recortar esta foto: se muestra completa.');
+  renderPreview();
 }
 
 async function selectProduct(productId, quote) {
@@ -220,11 +343,12 @@ async function selectProduct(productId, quote) {
   if (!product) return;
   st = stateFor(product, quote);
   fillForm();
+  applyPlan();
   renderPreview();
   if (st.imageUrl) {
     const forId = st.productId;
     const data = await loadSavedImage(st.imageUrl);
-    if (st && st.productId === forId && data) { st.imageData = data; renderPreview(); }
+    if (st && st.productId === forId && data) { st.imageData = data; renderPreview(); updateCutout(); }
   }
 }
 
@@ -233,7 +357,9 @@ async function usePhoto(dataUrl) {
   const jpeg = await compress(dataUrl);
   const forId = st.productId;
   st.imageData = jpeg;
+  st.cutout = null;
   renderPreview();
+  updateCutout();
   try {
     const { url } = await api('upload', { productId: forId, dataUrl: jpeg });
     if (st && st.productId === forId) { st.imageUrl = url; persist(); }
@@ -264,6 +390,10 @@ window.promoModule = {
     document.getElementById('promo-modal')?.remove();
     const label = 'block text-xs font-semibold mb-1';
     const input = 'input-field w-full px-3 py-2 text-sm';
+    const box = 'p-3 rounded-xl space-y-3';
+    const boxStyle = 'background: var(--bg-card-hover); border: 1px solid var(--border-color);';
+    const head = (t) => `<div class="text-xs font-semibold uppercase tracking-wide" style="color: var(--primary);">${t}</div>`;
+    const lbl = (t) => `<label class="${label}" style="color: var(--text-muted);">${t}</label>`;
     const wrap = document.createElement('div');
     wrap.id = 'promo-modal';
     wrap.className = 'fixed inset-0 z-[70] modal-overlay flex items-center justify-center p-4';
@@ -277,73 +407,82 @@ window.promoModule = {
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div class="space-y-4">
             <div>
-              <label class="${label}" style="color: var(--text-muted);">Producto</label>
+              ${lbl('Producto')}
               <select id="promo-product" class="${input}">
                 ${products.map((p) => `<option value="${esc(p.id)}" ${p.id === startId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
               </select>
             </div>
 
-            <div class="p-3 rounded-xl space-y-3" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
-              <div class="text-xs font-semibold uppercase tracking-wide" style="color: var(--primary);">1. Foto del producto</div>
+            <div class="${box}" style="${boxStyle}">
+              ${head('1. Foto del producto')}
               <div class="flex flex-wrap items-center gap-2">
                 <label class="btn-glass px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer"><i data-lucide="upload" class="w-4 h-4"></i> Subir foto
                   <input id="promo-file" type="file" accept="image/*" class="hidden"></label>
                 <div class="flex flex-1 min-w-[12rem] gap-2">
-                  <input id="promo-link" type="url" placeholder="o pega el enlace de una imagen" class="${input}">
+                  <input id="promo-link" type="url" placeholder="o pega el enlace de la foto o de la página del producto" class="${input}">
                   <button type="button" id="promo-link-btn" class="btn-glass px-3 py-2 rounded-xl text-xs font-semibold shrink-0">Usar</button>
                 </div>
               </div>
-              <div class="flex gap-2">
-                <input id="promo-q" type="text" placeholder="Buscar una foto en internet…" class="${input}">
-                <button type="button" id="promo-search-btn" class="btn-glass px-3 py-2 rounded-xl text-xs font-semibold shrink-0 flex items-center gap-1.5"><i data-lucide="search" class="w-4 h-4"></i> Buscar foto</button>
-              </div>
-              <div id="promo-results" class="grid grid-cols-4 gap-2"></div>
-              <p class="text-[10px]" style="color: var(--text-muted);">La búsqueda usa bancos de imágenes libres (Openverse y Wikimedia): son fotos genéricas, no de una marca o referencia exacta. Para la foto real del producto, súbela o pega su enlace.</p>
+              <label class="flex items-center gap-2 text-xs font-semibold cursor-pointer" style="color: var(--text-main);">
+                <input id="promo-cutout" type="checkbox"> Quitar el fondo de la foto con IA
+                <span id="promo-cutout-status" class="font-normal" style="color: var(--text-muted);"></span>
+              </label>
             </div>
 
-            <div class="p-3 rounded-xl space-y-3" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
-              <div class="text-xs font-semibold uppercase tracking-wide" style="color: var(--primary);">2. Ficha técnica con IA</div>
+            <div class="${box}" style="${boxStyle}">
+              ${head('2. Plan de crédito')}
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>${lbl('Cuota inicial ($)')}<input id="promo-initial" type="number" min="0" step="any" class="${input} font-mono"></div>
+                <div>${lbl('% Interés mensual')}<input id="promo-rate" type="number" min="0" step="any" class="${input} font-mono"></div>
+                <div>${lbl('Plazo (meses)')}<input id="promo-months" type="number" min="1" max="48" step="1" class="${input} font-mono"></div>
+                <div>${lbl('Frecuencia')}
+                  <select id="promo-frequency" class="${input}">
+                    <option value="semanal">Semanal</option><option value="quincenal">Quincenal</option><option value="mensual">Mensual</option>
+                  </select></div>
+              </div>
+              <p id="promo-plan-hint" class="text-xs" style="color: var(--text-muted);"></p>
+            </div>
+
+            <div class="${box}" style="${boxStyle}">
+              ${head('3. Inteligencia artificial')}
               <div>
-                <label class="${label}" style="color: var(--text-muted);">Comentarios para la IA (medidas, material, marca, color, garantía, lo que quieras destacar)</label>
+                ${lbl('Comentarios para la IA (medidas, material, marca, color, garantía, lo que quieras destacar)')}
                 <textarea id="promo-notes" rows="3" placeholder="Ej: puerta metálica calibre 20, 2 m × 90 cm, incluye chapa y marco, garantía 1 año" class="${input}"></textarea>
               </div>
-              <button type="button" id="promo-ai-btn" class="btn-primary px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"><i data-lucide="sparkles" class="w-4 h-4"></i> Generar ficha con IA</button>
-              <div>
-                <label class="${label}" style="color: var(--text-muted);">Frase publicitaria</label>
-                <input id="promo-tagline" type="text" class="${input}">
+              <div class="flex flex-wrap gap-2">
+                <button type="button" id="promo-ad-btn" class="btn-primary px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"><i data-lucide="sparkles" class="w-4 h-4"></i> Crear publicidad con IA</button>
+                <button type="button" id="promo-ai-btn" class="btn-glass px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"><i data-lucide="file-text" class="w-4 h-4"></i> Generar ficha con IA</button>
               </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label class="${label}" style="color: var(--text-muted);">Características (una por línea)</label>
-                  <textarea id="promo-features" rows="5" class="${input}"></textarea>
-                </div>
-                <div>
-                  <label class="${label}" style="color: var(--text-muted);">Especificaciones (Dato: valor)</label>
-                  <textarea id="promo-specs" rows="5" placeholder="Material: Acero&#10;Medidas: 2 m × 90 cm" class="${input}"></textarea>
-                </div>
-              </div>
-              <p class="text-[10px]" style="color: var(--text-muted);">Revisa lo que escribe la IA antes de enviarlo: puedes corregir cualquier dato aquí mismo.</p>
+              <p class="text-[10px]" style="color: var(--text-muted);">La IA recibe el producto, tus comentarios y el plan de crédito, y elige el titular, los colores y la letra. Los valores en pesos siempre salen de los números reales. Revisa los textos antes de enviar.</p>
             </div>
 
-            <div class="p-3 rounded-xl space-y-3" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
-              <div class="text-xs font-semibold uppercase tracking-wide" style="color: var(--primary);">3. Datos del anuncio</div>
-              <div>
-                <label class="${label}" style="color: var(--text-muted);">Título</label>
-                <input id="promo-title" type="text" class="${input}">
-              </div>
+            <div class="${box}" style="${boxStyle}">
+              ${head('4. Textos y diseño del anuncio')}
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label class="${label}" style="color: var(--text-muted);">Precio</label>
-                  <input id="promo-price" type="text" class="${input}">
-                </div>
-                <div>
-                  <label class="${label}" style="color: var(--text-muted);">Contacto (WhatsApp, dirección)</label>
-                  <input id="promo-contact" type="text" placeholder="Ej: WhatsApp 300 123 4567" class="${input}">
-                </div>
+                <div>${lbl('Titular')}<input id="promo-headline" type="text" class="${input}"></div>
+                <div>${lbl('Etiqueta')}<input id="promo-badge" type="text" class="${input}"></div>
               </div>
-              <div>
-                <label class="${label}" style="color: var(--text-muted);">Texto de las cuotas</label>
-                <input id="promo-plan" type="text" class="${input}">
+              <div>${lbl('Frase')}<input id="promo-tagline" type="text" class="${input}"></div>
+              <div>${lbl('Beneficios del anuncio (uno por línea, máximo 3)')}<textarea id="promo-bullets" rows="3" class="${input}"></textarea></div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>${lbl('Precio')}<input id="promo-price" type="text" class="${input}"></div>
+                <div>${lbl('Contacto (WhatsApp, dirección)')}<input id="promo-contact" type="text" placeholder="Ej: WhatsApp 300 123 4567" class="${input}"></div>
+              </div>
+              <div>${lbl('Texto de las cuotas')}<input id="promo-plan" type="text" class="${input}"></div>
+              <div class="grid grid-cols-4 gap-3 items-end">
+                <div>${lbl('Fondo 1')}<input id="promo-colorFrom" type="color" class="w-full h-9 rounded-lg cursor-pointer" style="background: transparent; border: 1px solid var(--border-color);"></div>
+                <div>${lbl('Fondo 2')}<input id="promo-colorTo" type="color" class="w-full h-9 rounded-lg cursor-pointer" style="background: transparent; border: 1px solid var(--border-color);"></div>
+                <div>${lbl('Resalte')}<input id="promo-accent" type="color" class="w-full h-9 rounded-lg cursor-pointer" style="background: transparent; border: 1px solid var(--border-color);"></div>
+                <div>${lbl('Letra')}
+                  <select id="promo-font" class="${input}">${Object.entries(FONTS).map(([k, f]) => `<option value="${k}">${f.label}</option>`).join('')}</select></div>
+              </div>
+            </div>
+
+            <div class="${box}" style="${boxStyle}">
+              ${head('5. Ficha técnica')}
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>${lbl('Características (una por línea)')}<textarea id="promo-features" rows="5" class="${input}"></textarea></div>
+                <div>${lbl('Especificaciones (Dato: valor)')}<textarea id="promo-specs" rows="5" placeholder="Material: Acero&#10;Medidas: 2 m × 90 cm" class="${input}"></textarea></div>
               </div>
             </div>
           </div>
@@ -365,13 +504,20 @@ window.promoModule = {
       </div>`;
     document.body.appendChild(wrap);
     if (window.lucide) window.lucide.createIcons();
+    ensureFonts().then(renderPreview);
 
     wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
     $('promo-close').addEventListener('click', close);
     $('promo-product').addEventListener('change', (e) => selectProduct(e.target.value, quote));
-    ['title', 'tagline', 'notes', 'features', 'specs', 'price', 'plan', 'contact'].forEach((k) => {
-      $('promo-' + k).addEventListener('input', (e) => { st[k] = e.target.value; if (k !== 'notes') renderPreview(); });
+    FIELDS.forEach((k) => {
+      const el = $('promo-' + k);
+      el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', (e) => {
+        st[k] = e.target.value;
+        if (PLAN_FIELDS.includes(k)) applyPlan();
+        if (k !== 'notes') renderPreview();
+      });
     });
+    $('promo-cutout').addEventListener('change', (e) => { st.useCutout = e.target.checked; renderPreview(); updateCutout(); });
     wrap.querySelectorAll('[data-promo-tab]').forEach((b) => b.addEventListener('click', () => { st.tab = b.dataset.promoTab; renderPreview(); }));
     $('promo-save-btn').addEventListener('click', () => persist(false));
 
@@ -383,46 +529,45 @@ window.promoModule = {
     });
     $('promo-link-btn').addEventListener('click', (e) => busy(e.currentTarget, 'Descargando…', async () => {
       const url = $('promo-link').value.trim();
-      if (!url) throw new Error('Pega primero el enlace de la imagen.');
+      if (!url) throw new Error('Pega primero el enlace de la foto o de la página del producto.');
       await usePhoto((await api('image', { url })).dataUrl);
       $('promo-link').value = '';
     }));
 
-    const search = (btn) => busy(btn, 'Buscando…', async () => {
-      const q = $('promo-q').value.trim();
-      if (!q) throw new Error('Escribe qué buscar.');
-      const { results } = await api('search', { q });
-      const box = $('promo-results');
-      box.innerHTML = results.length
-        ? results.map((r, i) => `<button type="button" data-result="${i}" title="${esc(r.title)} — ${esc(r.source)}" class="rounded-lg overflow-hidden" style="border: 1px solid var(--border-color); background: #fff; aspect-ratio: 1;"><img src="${esc(r.thumb)}" alt="" referrerpolicy="no-referrer" loading="lazy" style="width:100%;height:100%;object-fit:contain;display:block;"></button>`).join('')
-        : `<p class="col-span-4 text-xs" style="color: var(--text-muted);">No se encontraron imágenes para esa búsqueda. Prueba con otra palabra o sube la foto.</p>`;
-      box.querySelectorAll('[data-result]').forEach((b) => b.addEventListener('click', () => busy(b, '…', async () => {
-        const r = results[Number(b.dataset.result)];
-        let data;
-        // Some sites refuse the download: fall back to the (smaller) preview.
-        try { data = (await api('image', { url: r.url })).dataUrl; } catch { data = (await api('image', { url: r.thumb })).dataUrl; }
-        await usePhoto(data);
-      })));
-    });
-    $('promo-search-btn').addEventListener('click', (e) => search(e.currentTarget));
-    $('promo-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); search($('promo-search-btn')); } });
+    $('promo-ad-btn').addEventListener('click', (e) => busy(e.currentTarget, 'Diseñando…', async () => {
+      const product = db.getCollection('products').find((p) => p.id === st.productId);
+      const forId = st.productId;
+      const p = computePlan(st);
+      const out = await api('ad', {
+        name: st.title || product?.name, category: st.category, notes: st.notes, features: lines(st.features).join('; '),
+        total: p.total, initial: p.initial, installment: p.installment, count: p.count, frequency: p.frequency, months: p.months, rate: p.rate,
+        brandColor: brand().accent
+      });
+      if (!st || st.productId !== forId) return;
+      Object.assign(st, { headline: out.headline, badge: out.badge, tagline: out.subheadline, bullets: out.bullets.join('\n'), colorFrom: out.colorFrom, colorTo: out.colorTo, accent: out.accent, font: out.font, tab: 'ad' });
+      fillForm();
+      renderPreview();
+      persist();
+      showToast('Publicidad creada. Puedes ajustar textos y colores.', 'success');
+    }));
 
     $('promo-ai-btn').addEventListener('click', (e) => busy(e.currentTarget, 'Generando ficha…', async () => {
       const product = db.getCollection('products').find((p) => p.id === st.productId);
       const forId = st.productId;
       const out = await api('spec', { name: product?.name || st.title, category: st.category, notes: st.notes });
       if (!st || st.productId !== forId) return;
-      st.tagline = out.tagline;
+      if (!st.tagline) st.tagline = out.tagline;
       st.features = out.features.join('\n');
       st.specs = out.specs.map(([l, v]) => `${l}: ${v}`).join('\n');
-      ['tagline', 'features', 'specs'].forEach((k) => { $('promo-' + k).value = st[k]; });
       st.tab = 'sheet';
+      fillForm();
       renderPreview();
       persist();
       showToast('Ficha generada. Revísala antes de enviarla.', 'success');
     }));
 
     $('promo-share-btn').addEventListener('click', (e) => busy(e.currentTarget, 'Generando…', async () => {
+      await ensureFonts();
       const card = $('promo-preview').firstElementChild;
       const name = (st.title || 'producto').replace(/[^\p{L}\p{N}]+/gu, '_').slice(0, 40);
       const text = [st.title, st.price, st.plan].filter(Boolean).join(' · ');

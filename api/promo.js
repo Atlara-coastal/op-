@@ -4,6 +4,7 @@
  * Server side of the "Publicidad y ficha técnica" studio (js/promo.js). One function,
  * four actions, so the API keys never reach the browser:
  *   spec   { name, category, notes }  -> AI-written technical sheet (Google Gemini)
+ *   ad     { name, notes, plan… }     -> AI art direction of the ad (copy, gradient, lettering)
  *   search { q }                      -> product photos from Google Images (Custom Search)
  *   image  { url }                    -> downloads a remote picture as a data URL (the browser
  *                                        cannot read other sites' images into a canvas)
@@ -100,6 +101,78 @@ async function actionSpec(body) {
     tagline: text(out.tagline, 120),
     features: (Array.isArray(out.features) ? out.features : []).map((f) => text(f, 90)).filter(Boolean).slice(0, 6),
     specs: (Array.isArray(out.specs) ? out.specs : []).map((s) => [text(s?.label, 40), text(s?.value, 120)]).filter((s) => s[0] && s[1]).slice(0, 12)
+  };
+}
+
+// ---- ad: the AI acts as art director of the advertising image ---------------------------
+// It receives the product and the whole credit plan and returns the copy and the look
+// (gradient, accent, lettering). The amounts themselves are never written by the AI: the
+// page prints them from the real numbers.
+const AD_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    headline: { type: 'STRING' },
+    subheadline: { type: 'STRING' },
+    badge: { type: 'STRING' },
+    bullets: { type: 'ARRAY', items: { type: 'STRING' } },
+    colorFrom: { type: 'STRING' },
+    colorTo: { type: 'STRING' },
+    accent: { type: 'STRING' },
+    font: { type: 'STRING', enum: ['impacto', 'redonda', 'elegante'] }
+  },
+  required: ['headline', 'subheadline', 'badge', 'bullets', 'colorFrom', 'colorTo', 'accent', 'font']
+};
+
+const AD_SYSTEM = `Eres director creativo de publicidad para una tienda en Colombia que vende productos a crédito. Diseñas una imagen publicitaria para redes sociales y WhatsApp: el producto recortado sobre un fondo degradado, con letras grandes y llamativas.
+Recibes el producto y su plan de crédito. Devuelve:
+- "headline": titular muy corto y vendedor (2 a 4 palabras), sin emojis ni comillas. Debe nombrar o aludir al producto.
+- "subheadline": una frase de apoyo (máximo 10 palabras) que hable del beneficio o de lo fácil que es pagarlo.
+- "badge": etiqueta de 2 a 4 palabras para una cinta llamativa (ejemplos: "¡Sin cuota inicial!", "Llévalo hoy", "Paga quincenal"). Solo puedes decir "sin cuota inicial" si la cuota inicial es 0.
+- "bullets": de 2 a 3 beneficios muy cortos (máximo 5 palabras cada uno), tomados de los comentarios y características.
+- "colorFrom" y "colorTo": los dos colores del degradado de fondo en formato #RRGGBB. Elige una combinación moderna, intensa y elegante que combine con el producto y haga que resalte (no uses blanco ni gris claro).
+- "accent": un color #RRGGBB muy vivo que contraste con el fondo, para resaltar el precio.
+- "font": "impacto" (letras gruesas condensadas, para ofertas y tecnología), "redonda" (amigable, para hogar y familia) o "elegante" (con serifa, para productos finos).
+Reglas: NO escribas precios, valores, porcentajes ni número de cuotas en ningún texto: esos datos los pone el sistema. No inventes características que no estén en los datos. Español de Colombia con ortografía y tildes correctas: revisa cada palabra antes de responder.`;
+
+const hex = (v, fallback) => (/^#[0-9a-f]{6}$/i.test(String(v || '').trim()) ? String(v).trim().toLowerCase() : fallback);
+
+async function actionAd(body) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new ApiError(503, 'La IA todavía no está configurada: falta la clave GEMINI_API_KEY en Vercel.', 'not_configured');
+  const name = text(body.name, 200);
+  if (!name) throw new ApiError(400, 'Falta el nombre del producto.');
+  const n = (v) => Math.max(0, Math.round(Number(v) || 0));
+  const prompt = [
+    `Producto: ${name}`,
+    `Categoría: ${text(body.category, 80) || 'Sin categoría'}`,
+    `Comentarios del vendedor: ${text(body.notes, 1500) || 'Ninguno'}`,
+    `Características conocidas: ${text(body.features, 600) || 'Ninguna'}`,
+    `Precio total a crédito: ${n(body.total)} pesos`,
+    `Cuota inicial: ${n(body.initial)} pesos`,
+    `Plan: ${n(body.count)} cuotas ${text(body.frequency, 20) || 'mensual'}es de ${n(body.installment)} pesos, plazo de ${n(body.months)} meses, interés ${Number(body.rate) || 0}% mensual`,
+    `Color de la marca (úsalo solo si combina): ${hex(body.brandColor, 'ninguno')}`
+  ].join('\n');
+  const { r, data } = await gemini(key, {
+    systemInstruction: { parts: [{ text: AD_SYSTEM }] },
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.9, responseMimeType: 'application/json', responseSchema: AD_SCHEMA }
+  });
+  if (r.status === 429) throw new ApiError(429, 'Se alcanzó el límite gratuito de la IA por ahora. Inténtalo de nuevo en un minuto.', 'rate_limited');
+  if (!r.ok) {
+    console.error('[promo:ad]', r.status, data?.error?.message);
+    throw new ApiError(502, 'La IA no respondió (' + (data?.error?.message || r.status) + ').');
+  }
+  let out;
+  try { out = JSON.parse((data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('')); } catch { throw new ApiError(502, 'La IA devolvió una respuesta que no se pudo leer. Inténtalo de nuevo.'); }
+  return {
+    headline: text(out.headline, 40),
+    subheadline: text(out.subheadline, 90),
+    badge: text(out.badge, 30),
+    bullets: (Array.isArray(out.bullets) ? out.bullets : []).map((b) => text(b, 40)).filter(Boolean).slice(0, 3),
+    colorFrom: hex(out.colorFrom, '#1e1b4b'),
+    colorTo: hex(out.colorTo, '#7c3aed'),
+    accent: hex(out.accent, '#facc15'),
+    font: ['impacto', 'redonda', 'elegante'].includes(out.font) ? out.font : 'impacto'
   };
 }
 
@@ -271,8 +344,15 @@ async function fetchPublic(raw, accept, timeoutMs) {
   }
 }
 
+// Accepts the direct link of a picture or the link of a product page (a shop, the
+// manufacturer): for a page, the picture it announces for itself is downloaded.
 async function actionImage(body) {
-  const { r } = await fetchPublic(String(body.url || '').trim(), 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8', 12000);
+  let { r, url } = await fetchPublic(String(body.url || '').trim(), 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8,text/html;q=0.7', 12000);
+  if (r.ok && /html/i.test(r.headers.get('content-type') || '')) {
+    const picture = pageImage((await r.text()).slice(0, 600000), url);
+    if (!picture) throw new ApiError(415, 'No se encontró la foto del producto en esa página. Abre la foto, copia su enlace ("Copiar dirección de imagen") y pégalo aquí.');
+    ({ r } = await fetchPublic(picture, 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8', 12000));
+  }
   if (!r.ok) throw new ApiError(502, 'Ese sitio no dejó descargar la imagen (' + r.status + '). Prueba con otra.');
   const type = (r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
   if (!/^image\/(jpeg|png|webp|gif|avif)$/.test(type)) throw new ApiError(415, 'El enlace no es una imagen (jpg, png o webp).');
@@ -321,6 +401,7 @@ export default async function handler(req, res) {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     let out;
     if (body.action === 'spec') out = await actionSpec(body);
+    else if (body.action === 'ad') out = await actionAd(body);
     else if (body.action === 'search') out = await actionSearch(body);
     else if (body.action === 'image') out = await actionImage(body);
     else if (body.action === 'upload') out = await actionUpload(admin, body);
