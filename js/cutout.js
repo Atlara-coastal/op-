@@ -1,28 +1,10 @@
 /**
- * Background removal for product photos, done by an AI model that runs in the browser
- * (U²-Net "p", Apache-2.0, ~4 MB, downloaded once and cached) — no server and no cost.
- * removeBackground(dataUrl) resolves to { dataUrl, width, height } — a transparent PNG
- * trimmed to the product — or null when the model finds nothing clear to cut out.
+ * Background removal for product photos. The AI model runs on the server (api/promo.js,
+ * action "cutout") and answers with a small transparency mask; here the photo is only
+ * painted through that mask and trimmed to the product — no model runs on the device.
+ * removeBackground(dataUrl, getMask) resolves to { dataUrl, width, height } (transparent
+ * PNG) or null when there is no clear product to cut out.
  */
-const LIB = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.5';
-const MODEL = 'BritishWerewolf/U-2-Netp';
-const SIZE = 320;
-const MEAN = [0.485, 0.456, 0.406];
-const STD = [0.229, 0.224, 0.225];
-
-let ready = null;
-function load() {
-  if (!ready) {
-    ready = (async () => {
-      const T = await import(LIB);
-      const model = await T.AutoModel.from_pretrained(MODEL, { dtype: 'fp32' });
-      return { T, model, input: model.sessions.model.inputNames[0] };
-    })();
-    ready.catch(() => { ready = null; }); // let a later attempt retry (e.g. it was offline)
-  }
-  return ready;
-}
-
 const loadImage = (src) => new Promise((resolve, reject) => {
   const im = new Image();
   im.onload = () => resolve(im);
@@ -30,41 +12,20 @@ const loadImage = (src) => new Promise((resolve, reject) => {
   im.src = src;
 });
 
-export async function removeBackground(dataUrl, maxSide = 900) {
-  const [{ T, model, input }, im] = await Promise.all([load(), loadImage(dataUrl)]);
+// getMask(dataUrl) -> { size, mask } where mask is base64 of size×size alpha bytes (or null).
+export async function removeBackground(dataUrl, getMask, maxSide = 760) {
+  const [{ size, mask: encoded }, im] = await Promise.all([getMask(dataUrl), loadImage(dataUrl)]);
+  if (!encoded) return null;
 
-  // photo -> 320×320 normalized tensor
-  const small = document.createElement('canvas');
-  small.width = SIZE; small.height = SIZE;
-  const sctx = small.getContext('2d', { willReadFrequently: true });
-  sctx.drawImage(im, 0, 0, SIZE, SIZE);
-  const px = sctx.getImageData(0, 0, SIZE, SIZE).data;
-  const data = new Float32Array(3 * SIZE * SIZE);
-  for (let i = 0; i < SIZE * SIZE; i++) {
-    for (let ch = 0; ch < 3; ch++) data[ch * SIZE * SIZE + i] = (px[i * 4 + ch] / 255 - MEAN[ch]) / STD[ch];
-  }
-  const output = await model({ [input]: new T.Tensor('float32', data, [1, 3, SIZE, SIZE]) });
-  const m = output[Object.keys(output)[0]].data;
-
-  // saliency map -> alpha. The steep curve removes the pale halo the soft mask leaves.
-  let lo = Infinity, hi = -Infinity;
-  for (const v of m) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  const bytes = atob(encoded);
   const mask = document.createElement('canvas');
-  mask.width = SIZE; mask.height = SIZE;
+  mask.width = size; mask.height = size;
   const mctx = mask.getContext('2d');
-  const md = mctx.createImageData(SIZE, SIZE);
-  let covered = 0;
-  for (let i = 0; i < SIZE * SIZE; i++) {
-    const t = Math.min(1, Math.max(0, ((m[i] - lo) / (hi - lo || 1) - 0.4) / 0.35));
-    const a = t * t * (3 - 2 * t);
-    md.data[i * 4 + 3] = Math.round(a * 255);
-    if (a > 0.5) covered++;
-  }
-  const share = covered / (SIZE * SIZE);
-  if (share < 0.03 || share > 0.93) return null; // nothing, or everything: no real cut-out
+  const md = mctx.createImageData(size, size);
+  for (let i = 0; i < size * size; i++) md.data[i * 4 + 3] = bytes.charCodeAt(i);
   mctx.putImageData(md, 0, 0);
 
-  // apply the mask at the working size and trim to the product
+  // paint the photo through the mask at the working size…
   const k = Math.min(1, maxSide / Math.max(im.width, im.height));
   const w = Math.max(1, Math.round(im.width * k));
   const h = Math.max(1, Math.round(im.height * k));
@@ -76,6 +37,7 @@ export async function removeBackground(dataUrl, maxSide = 900) {
   ctx.globalCompositeOperation = 'source-in';
   ctx.drawImage(im, 0, 0, w, h);
 
+  // …and trim it to the product
   const alpha = ctx.getImageData(0, 0, w, h).data;
   let x0 = w, y0 = h, x1 = -1, y1 = -1;
   for (let y = 0; y < h; y++) {

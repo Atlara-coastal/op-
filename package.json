@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
-    "firebase-admin": "^14.4.0"
+    "firebase-admin": "^14.4.0",
+    "jpeg-js": "^0.4.4",
+    "onnxruntime-node": "1.16.3"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.19"

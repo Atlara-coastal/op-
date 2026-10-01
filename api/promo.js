@@ -8,12 +8,14 @@
  *   search { q }                      -> product photos from Google Images (Custom Search)
  *   image  { url }                    -> downloads a remote picture as a data URL (the browser
  *                                        cannot read other sites' images into a canvas)
- *   upload { productId, dataUrl }     -> stores the product photo in Supabase Storage
+ *   cutout { dataUrl }                -> background-removal mask of the photo (AI model run here)
+ *   upload { productId, dataUrl }     -> stores the product photo / cut-out in Supabase Storage
  * Environment variables (Vercel, never committed):
  *   GEMINI_API_KEY [, GEMINI_MODEL]   -> action "spec", and "search" (Gemini + Google Search)
  *   GOOGLE_CSE_KEY, GOOGLE_CSE_CX     -> optional: "search" straight from Google Images
  */
 import dns from 'dns/promises';
+import { readFile } from 'fs/promises';
 import net from 'net';
 import { getSupabaseAdmin, getCaller } from './_supabaseAdmin.js';
 
@@ -23,6 +25,7 @@ export const config = { maxDuration: 60 };
 const BUCKET = 'product-images';
 const MAX_REMOTE_IMAGE = 3 * 1024 * 1024;
 const MAX_UPLOAD = 700 * 1024;
+const MAX_CUTOUT_UPLOAD = 2 * 1024 * 1024;
 
 class ApiError extends Error {
   constructor(status, message, code) { super(message); this.status = status; this.code = code; }
@@ -362,20 +365,91 @@ async function actionImage(body) {
   return { dataUrl: `data:${type};base64,${buf.toString('base64')}` };
 }
 
-// ---- upload: keep the (already compressed) product photo in Supabase Storage ------------
-async function actionUpload(admin, body) {
+// ---- cutout: where the product is in the photo (background removal) ----------------------
+// A small AI model (U²-Net "p", Apache-2.0, bundled in api/_models) runs here on the server,
+// so nothing heavy runs on the users' devices. Returns a 320×320 transparency mask; the page
+// only has to paint the photo through it.
+const CUT = 320;
+const CUT_MEAN = [0.485, 0.456, 0.406];
+const CUT_STD = [0.229, 0.224, 0.225];
+let cutoutModel = null;
+function loadCutoutModel() {
+  if (!cutoutModel) {
+    cutoutModel = (async () => {
+      const ort = (await import('onnxruntime-node')).default;
+      const session = await ort.InferenceSession.create(await readFile(new URL('./_models/u2netp.onnx', import.meta.url)));
+      return { ort, session };
+    })();
+    cutoutModel.catch(() => { cutoutModel = null; });
+  }
+  return cutoutModel;
+}
+
+async function actionCutout(body) {
   const match = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(body.dataUrl || ''));
   if (!match) throw new ApiError(400, 'La foto debe enviarse como JPEG.');
   const bytes = Buffer.from(match[1], 'base64');
   if (!bytes.length || bytes.length > MAX_UPLOAD) throw new ApiError(413, 'La foto es demasiado pesada.');
+  const jpeg = (await import('jpeg-js')).default;
+  let img;
+  try { img = jpeg.decode(bytes, { useTArray: true, maxMemoryUsageInMB: 256, maxResolutionInMP: 8 }); } catch { throw new ApiError(400, 'No se pudo leer la foto.'); }
+
+  // photo -> 320×320 (bilinear) normalized tensor
+  const { width: w, height: h, data: px } = img;
+  const input = new Float32Array(3 * CUT * CUT);
+  for (let y = 0; y < CUT; y++) {
+    const fy = Math.min(h - 1, ((y + 0.5) * h) / CUT - 0.5);
+    const y0 = Math.max(0, Math.floor(fy)), y1 = Math.min(h - 1, y0 + 1), ty = Math.max(0, fy - y0);
+    for (let x = 0; x < CUT; x++) {
+      const fx = Math.min(w - 1, ((x + 0.5) * w) / CUT - 0.5);
+      const x0 = Math.max(0, Math.floor(fx)), x1 = Math.min(w - 1, x0 + 1), tx = Math.max(0, fx - x0);
+      for (let ch = 0; ch < 3; ch++) {
+        const a = px[(y0 * w + x0) * 4 + ch], b = px[(y0 * w + x1) * 4 + ch], c = px[(y1 * w + x0) * 4 + ch], d = px[(y1 * w + x1) * 4 + ch];
+        const v = (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
+        input[ch * CUT * CUT + y * CUT + x] = (v / 255 - CUT_MEAN[ch]) / CUT_STD[ch];
+      }
+    }
+  }
+  const { ort, session } = await loadCutoutModel();
+  const out = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', input, [1, 3, CUT, CUT]) });
+  const m = out[session.outputNames[0]].data;
+
+  // saliency -> alpha. The steep curve removes the pale halo a soft mask leaves.
+  let lo = Infinity, hi = -Infinity;
+  for (const v of m) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  const alpha = Buffer.alloc(CUT * CUT);
+  let covered = 0;
+  for (let i = 0; i < CUT * CUT; i++) {
+    const t = Math.min(1, Math.max(0, ((m[i] - lo) / (hi - lo || 1) - 0.4) / 0.35));
+    const a = t * t * (3 - 2 * t);
+    alpha[i] = Math.round(a * 255);
+    if (a > 0.5) covered++;
+  }
+  const share = covered / (CUT * CUT);
+  // nothing, or everything: there is no clear product to cut out
+  if (share < 0.03 || share > 0.93) return { size: CUT, mask: null };
+  return { size: CUT, mask: alpha.toString('base64') };
+}
+
+// ---- upload: keep the product photo (JPEG) or its cut-out (PNG) in Supabase Storage ------
+async function actionUpload(admin, body) {
+  const match = /^data:image\/(jpeg|png);base64,([A-Za-z0-9+/=]+)$/.exec(String(body.dataUrl || ''));
+  if (!match) throw new ApiError(400, 'La foto debe enviarse como JPEG o PNG.');
+  const png = match[1] === 'png';
+  const limit = png ? MAX_CUTOUT_UPLOAD : MAX_UPLOAD;
+  const bytes = Buffer.from(match[2], 'base64');
+  if (!bytes.length || bytes.length > limit) throw new ApiError(413, 'La foto es demasiado pesada.');
   const productId = String(body.productId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
   if (!productId) throw new ApiError(400, 'Falta el producto.');
 
-  const { error: bucketError } = await admin.storage.createBucket(BUCKET, { public: true, fileSizeLimit: MAX_UPLOAD, allowedMimeTypes: ['image/jpeg'] });
+  const bucket = { public: true, fileSizeLimit: MAX_CUTOUT_UPLOAD, allowedMimeTypes: ['image/jpeg', 'image/png'] };
+  const { error: bucketError } = await admin.storage.createBucket(BUCKET, bucket);
   if (bucketError && !/exist/i.test(bucketError.message || '')) throw bucketError;
+  // buckets created before cut-outs existed only accepted small JPEGs
+  if (bucketError && png) await admin.storage.updateBucket(BUCKET, bucket);
 
-  const path = `${productId}/${Date.now()}.jpg`;
-  const { error } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: true });
+  const path = `${productId}/${Date.now()}.${png ? 'png' : 'jpg'}`;
+  const { error } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: png ? 'image/png' : 'image/jpeg', cacheControl: '31536000', upsert: true });
   if (error) throw error;
   return { url: admin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl };
 }
@@ -404,6 +478,7 @@ export default async function handler(req, res) {
     else if (body.action === 'ad') out = await actionAd(body);
     else if (body.action === 'search') out = await actionSearch(body);
     else if (body.action === 'image') out = await actionImage(body);
+    else if (body.action === 'cutout') out = await actionCutout(body);
     else if (body.action === 'upload') out = await actionUpload(admin, body);
     else throw new ApiError(400, 'Acción desconocida.');
     res.status(200).json(out);

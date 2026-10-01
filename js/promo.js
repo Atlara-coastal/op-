@@ -8,8 +8,8 @@
  * Both are shareable as PNG. window.promoModule.open({ productId, quoteId }).
  * The photo can be uploaded or taken from a link (a picture or a product page); photo,
  * comments, sheet and ad design are saved on the product so they are prepared only once.
- * The AI texts and the photo storage run on the server (api/promo.js) to keep the keys
- * private; the background removal runs in the browser (js/cutout.js).
+ * The AI (texts and background removal) and the photo storage run on the server
+ * (api/promo.js); the device only draws the result.
  */
 import { db } from './db.js';
 import { supabase } from './supabase-client.js';
@@ -48,7 +48,7 @@ function luminance(hex) {
   const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
-const inkOn = (...colors) => (colors.reduce((a, c) => a + luminance(c), 0) / colors.length > 0.4 ? '#0b1220' : '#ffffff');
+const inkOn = (...colors) => (colors.reduce((a, c) => a + luminance(c), 0) / colors.length > 0.3 ? '#0b1220' : '#ffffff');
 
 async function ensureFonts() {
   if (!document.getElementById('promo-fonts')) {
@@ -257,7 +257,10 @@ function stateFor(product, quote) {
     title: fromQuote && names.length > 1 ? names.join(' + ') : product.name,
     imageUrl: product.imageUrl || '',
     imageData: null,
+    storedSrc: null,
     cutout: null,
+    cutoutUrl: product.cutoutUrl || '',
+    cutoutFor: product.cutoutFor || '',
     useCutout: read(CUTOUT_KEY, '1') === '1',
     notes: product.promoNotes || '',
     tagline: spec.tagline || '',
@@ -293,6 +296,8 @@ function persist(silent = true) {
   }
   db.updateItem('products', st.productId, {
     imageUrl: st.imageUrl || '',
+    cutoutUrl: st.cutoutUrl || '',
+    cutoutFor: st.cutoutFor || '',
     promoNotes: st.notes || '',
     spec: { tagline: st.tagline || '', features: lines(st.features), specs: specRows(st.specs) },
     adDesign: { headline: st.headline || '', badge: st.badge || '', bullets: lines(st.bullets), colorFrom: st.colorFrom, colorTo: st.colorTo, accent: st.accent, font: st.font }
@@ -323,19 +328,29 @@ function fillForm() {
 
 function cutStatus(text) { const el = $('promo-cutout-status'); if (el) el.textContent = text; }
 
-// Cuts the product out of the current photo (AI model in the browser, see js/cutout.js).
+// Cuts the product out of the current photo. The AI model runs on the server (api/promo.js
+// "cutout"); the result is stored with the product, so it is worked out once per photo and
+// every device just downloads it.
 async function updateCutout() {
   if (!st || !st.imageData || !st.useCutout) { cutStatus(''); return; }
+  if (st.cutout) { cutStatus('Fondo quitado.'); return; }
   const src = st.imageData;
+  const forId = st.productId;
   if (lastCut.src === src) { st.cutout = lastCut.result; cutStatus(st.cutout ? 'Fondo quitado.' : 'No se pudo recortar esta foto: se muestra completa.'); renderPreview(); return; }
-  cutStatus('Quitando el fondo con IA… (la primera vez tarda un poco más)');
+  cutStatus('Quitando el fondo con IA…');
   let result = null;
-  try { result = await removeBackground(src); } catch (e) { console.error(e); }
+  try { result = await removeBackground(src, (dataUrl) => api('cutout', { dataUrl })); } catch (e) { console.error(e); cutStatus('No se pudo quitar el fondo: ' + (e.message || 'error')); return; }
   lastCut = { src, result };
   if (!st || st.imageData !== src) return;
   st.cutout = result;
   cutStatus(result ? 'Fondo quitado.' : 'No se pudo recortar esta foto: se muestra completa.');
   renderPreview();
+  if (result && st.storedSrc === src && st.imageUrl) {
+    try {
+      const { url } = await api('upload', { productId: forId, dataUrl: result.dataUrl });
+      if (st && st.productId === forId && st.imageData === src) { st.cutoutUrl = url; st.cutoutFor = st.imageUrl; persist(); }
+    } catch (e) { console.error(e); }
+  }
 }
 
 async function selectProduct(productId, quote) {
@@ -347,8 +362,14 @@ async function selectProduct(productId, quote) {
   renderPreview();
   if (st.imageUrl) {
     const forId = st.productId;
-    const data = await loadSavedImage(st.imageUrl);
-    if (st && st.productId === forId && data) { st.imageData = data; renderPreview(); updateCutout(); }
+    const saved = st.cutoutUrl && st.cutoutFor === st.imageUrl;
+    const [data, cut] = await Promise.all([loadSavedImage(st.imageUrl), saved ? loadSavedImage(st.cutoutUrl) : null]);
+    if (!st || st.productId !== forId || !data) return;
+    st.imageData = data;
+    st.storedSrc = data;
+    if (cut) st.cutout = { dataUrl: cut };
+    renderPreview();
+    updateCutout();
   }
 }
 
@@ -358,15 +379,17 @@ async function usePhoto(dataUrl) {
   const forId = st.productId;
   st.imageData = jpeg;
   st.cutout = null;
+  st.cutoutUrl = '';
+  st.cutoutFor = '';
   renderPreview();
-  updateCutout();
   try {
     const { url } = await api('upload', { productId: forId, dataUrl: jpeg });
-    if (st && st.productId === forId) { st.imageUrl = url; persist(); }
+    if (st && st.productId === forId && st.imageData === jpeg) { st.imageUrl = url; st.storedSrc = jpeg; persist(); }
     showToast('Foto guardada en el producto', 'success');
   } catch (e) {
     showToast('La foto se usará ahora, pero no se pudo guardar: ' + e.message, 'warning');
   }
+  if (st && st.imageData === jpeg) updateCutout();
 }
 
 async function busy(btn, label, fn) {
