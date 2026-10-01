@@ -216,6 +216,7 @@ function renderTable(searchTerm = '') {
           <div class="pt-2 flex items-center justify-between gap-2" style="border-top: 1px solid var(--border-color);">
             <div><span class="block text-[10px] uppercase font-semibold" style="color: var(--text-muted);">Costo total</span><strong class="text-base font-mono" style="color: var(--success);">${formatCurrency(p.cost + extVal)}</strong></div>
             <div class="flex items-center gap-1.5">
+              <button onclick="window.promoModule.open({ productId: '${p.id}' })" title="Publicidad y ficha técnica" class="p-1.5 rounded-lg" style="background: var(--bg-card-hover); border: 1px solid var(--border-color); color: var(--primary);"><i data-lucide="megaphone" class="w-4 h-4"></i></button>
               <button onclick="window.productsModule.editProduct('${p.id}')" title="Editar" class="p-1.5 rounded-lg" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted);"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
               <button onclick="window.productsModule.deleteProduct('${p.id}')" title="Eliminar" class="p-1.5 rounded-lg" style="background: var(--danger-bg); color: var(--danger);"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
             </div>
@@ -267,6 +268,7 @@ function renderTable(searchTerm = '') {
         </td>
         <td class="px-5 py-4 text-center">
           <div class="flex items-center justify-center gap-2">
+            <button onclick="window.promoModule.open({ productId: '${p.id}' })" title="Publicidad y ficha técnica" class="p-1.5 rounded-lg" style="background: var(--bg-card-hover); border: 1px solid var(--border-color); color: var(--primary);"><i data-lucide="megaphone" class="w-4 h-4"></i></button>
             <button onclick="window.productsModule.editProduct('${p.id}')" class="p-1.5 rounded-lg" style="background: var(--bg-card-hover); border: 1px solid var(--border-color); color: var(--text-muted);">
               <i data-lucide="edit-3" class="w-4 h-4"></i>
             </button>

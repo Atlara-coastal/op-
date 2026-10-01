@@ -23,6 +23,9 @@ export function renderQuotes(container) {
           <p class="text-sm" style="color: var(--text-muted);">Crea cotizaciones personalizadas e imprímelas o conviértelas directamente en ventas a crédito.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <button onclick="window.promoModule.open()" class="btn-glass px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2">
+            <i data-lucide="megaphone" class="w-4.5 h-4.5"></i> Publicidad y ficha
+          </button>
           <button onclick="window.creditCalc.open()" class="btn-glass px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2">
             <i data-lucide="calculator" class="w-4.5 h-4.5"></i> Calculadora de crédito
           </button>
@@ -83,6 +86,9 @@ export function renderQuotes(container) {
               </button>
               <button onclick="window.quotesModule.convertToSale('${q.id}')" class="flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5" style="background: var(--success); color: var(--text-on-primary);">
                 <i data-lucide="arrow-right-circle" class="w-3.5 h-3.5"></i> Convertir a Venta
+              </button>
+              <button onclick="window.promoModule.open({ quoteId: '${q.id}' })" title="Publicidad y ficha técnica" class="p-2 rounded-xl shrink-0" style="background: var(--bg-card-hover); border: 1px solid var(--border-color); color: var(--primary);">
+                <i data-lucide="megaphone" class="w-4 h-4"></i>
               </button>
               <button onclick="window.quotesModule.deleteQuote('${q.id}')" title="Eliminar cotización" class="p-2 rounded-xl shrink-0" style="background: var(--danger-bg); color: var(--danger);">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>

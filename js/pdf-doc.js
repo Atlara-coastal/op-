@@ -21,7 +21,11 @@ const logo = (b) => 'data:image/svg+xml;utf8,' + encodeURIComponent(
   '<path d="M188 262l46 48 92-104" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 );
 
-export const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// For documents that draw their own header (see js/promo.js).
+export const BRAND_NAME = 'OP';
+export const brandLogo = () => logo(brand());
+
+export const esc =(s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // Pieces for building document bodies.
 export const docBox = (label, inner, tone = 'soft') => {
@@ -65,6 +69,22 @@ const loadScript = (src) => new Promise((resolve, reject) => {
   document.head.appendChild(s);
 });
 
+// html2canvas mis-draws SVG images (the logo comes out as a black shape): swap them for a
+// PNG rendered by the browser itself before capturing.
+async function rasterizeSvgImages(el) {
+  await Promise.all([...el.querySelectorAll('img[src^="data:image/svg"]')].map(async (img) => {
+    try {
+      if (!img.complete) await new Promise((ok) => { img.onload = ok; img.onerror = ok; });
+      const size = Math.max(img.width, img.height, 46) * 4;
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      c.getContext('2d').drawImage(img, 0, 0, size, size);
+      const png = c.toDataURL('image/png');
+      await new Promise((ok) => { img.onload = ok; img.onerror = ok; img.src = png; });
+    } catch (e) { /* keep the SVG */ }
+  }));
+}
+
 // Renders the element as an A4 PDF and shares it (mobile) or downloads it.
 export function fitPaper(container) {
   const el = container.firstElementChild;
@@ -81,6 +101,7 @@ export async function exportPdf(el, filename) {
     window.html2canvas || loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'),
     window.jspdf || loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js')
   ]);
+  await rasterizeSvgImages(el);
   let canvas;
   try { canvas = await window.html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true }); } finally { el.style.zoom = prevZoom; }
   const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
@@ -136,6 +157,7 @@ export async function exportImage(el, filename, text = '') {
   const prevZoom = el.style.zoom;
   el.style.zoom = '1';
   await Promise.all([window.html2canvas || loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js')]);
+  await rasterizeSvgImages(el);
   let canvas;
   try { canvas = await window.html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true }); } finally { el.style.zoom = prevZoom; }
   const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
