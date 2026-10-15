@@ -56,13 +56,12 @@ export function amortization(principal, ratePct, months) {
 }
 
 // Installments are charged in round figures: the exact MONTHLY installment goes to the
-// NEAREST $10.000 (183.686 → 180.000) and the total of the plan follows it
-// (monthly installment × months). It never rounds below what repays the capital, and a plan
-// without interest is left exact.
+// NEXT $10.000 up, never down (183.686 → 190.000; 180.000 stays 180.000) and the total of the
+// plan follows it (monthly installment × months). A plan without interest is left exact.
 export const INSTALLMENT_STEP = 10000;
-export function roundInstallment(exact, capitalPerPayment = 0) {
-  const rounded = Math.round(exact / INSTALLMENT_STEP) * INSTALLMENT_STEP;
-  return rounded >= capitalPerPayment && rounded > 0 ? rounded : Math.ceil(exact / INSTALLMENT_STEP) * INSTALLMENT_STEP;
+export function roundInstallment(exact) {
+  // the small epsilon keeps float noise (e.g. 180000.0000001) from jumping a whole step
+  return Math.ceil(exact / INSTALLMENT_STEP - 1e-9) * INSTALLMENT_STEP;
 }
 
 // Financing of a debt in n payments: monthly interest on the outstanding balance, then the
@@ -75,7 +74,7 @@ export function financePlan(debt, ratePct, installments = 1, frequency = 'mensua
   // and a fortnightly/weekly payment is just that monthly installment split in 2 / 4, so
   // 12 fortnights cost exactly the same as 6 months.
   const months = termMonths(n, frequency);
-  const monthly = roundInstallment((debt + exactInterest) / months, debt / months);
+  const monthly = roundInstallment((debt + exactInterest) / months);
   const financed = Math.round(monthly * months);
   return { installments: n, installment: financed / n, monthly, financed, interest: financed - debt };
 }

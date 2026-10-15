@@ -26,7 +26,7 @@ function renderResult() {
       <div class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--text-muted);">${label}</div>
       <div class="text-lg font-extrabold font-mono mt-0.5" style="color: ${color};">${value}</div>
     </div>`;
-  // What is actually charged: the MONTHLY installment rounded to the nearest $10.000; a
+  // What is actually charged: the MONTHLY installment rounded UP to the next $10.000; a
   // fortnightly/weekly payment is that monthly installment split in 2 / 4.
   const modal = document.getElementById('credit-calc-modal');
   const frequency = modal?.dataset.frequency || 'mensual';
@@ -75,7 +75,7 @@ function renderResult() {
         </tbody>
       </table>
     </div>
-    <p class="text-[11px]" style="color: var(--text-muted);">El interés de cada mes se calcula sobre el saldo pendiente del mes anterior. La última cuota se ajusta por redondeo para que el saldo quede en $ 0. La tabla muestra el cálculo exacto; la cuota que se cobra se redondea a los $ 10.000 más cercanos.</p>`;
+    <p class="text-[11px]" style="color: var(--text-muted);">El interés de cada mes se calcula sobre el saldo pendiente del mes anterior. La última cuota se ajusta por redondeo para que el saldo quede en $ 0. La tabla muestra el cálculo exacto; la cuota que se cobra se redondea hacia arriba, a los siguientes $ 10.000.</p>`;
 }
 
 window.creditCalc = {
