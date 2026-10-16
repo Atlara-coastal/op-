@@ -9,7 +9,7 @@ const C = { ink: '#0b1220', muted: '#5b6b7f', line: '#e2e8f0', soft: '#f1f5f9', 
 // Accent follows the active business space (see js/theme.js applyTenantTheme).
 const PALETTES = {
   green: { accent: '#16a34a', accentSoft: '#ecfdf5', accentLine: '#bbf7d0', bright: '#4ade80', ring: ['#86efac', '#4ade80', '#16a34a'] },
-  pink: { accent: '#db2777', accentSoft: '#fdf2f8', accentLine: '#fbcfe8', bright: '#f472b6', ring: ['#f9a8d4', '#f472b6', '#db2777'] }
+  pink: { accent: '#7c6fd6', accentSoft: '#f5f3ff', accentLine: '#ddd6fe', bright: '#b4a7f5', ring: ['#cfc6fa', '#b4a7f5', '#7c6fd6'] }
 };
 export const brand = () => PALETTES[document.documentElement.dataset.tenantTheme] || PALETTES.green;
 

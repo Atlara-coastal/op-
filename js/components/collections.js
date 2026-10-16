@@ -153,7 +153,11 @@ export function renderCollections(container) {
   drawChart(rows.slice().reverse());
 }
 
+let lastRows = null;
+window.addEventListener('themechange', () => { if (lastRows && document.getElementById('collections-chart')) drawChart(lastRows); });
+
 function drawChart(rows) {
+  lastRows = rows;
   const canvas = document.getElementById('collections-chart');
   if (chart) { chart.destroy(); chart = null; }
   if (!canvas || !window.Chart) return;

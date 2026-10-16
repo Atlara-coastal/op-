@@ -65,6 +65,8 @@ export function initTheme() {
       const next = current === 'dark' ? 'light' : 'dark';
       try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
       applyTheme(next);
+      // charts bake theme colours in when drawn, so they listen for this to redraw
+      window.dispatchEvent(new Event('themechange'));
     });
   }
 }

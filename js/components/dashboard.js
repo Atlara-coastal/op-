@@ -319,7 +319,13 @@ export function renderDashboard(container) {
   renderCharts(totalSalesAmount, totalPaidAmount, totalOutstandingDebt, tipo1Count, tipo2Count, tipo3Count);
 }
 
+let lastChartArgs = null;
+window.addEventListener('themechange', () => {
+  if (lastChartArgs && document.getElementById('chart-financial-overview')) renderCharts(...lastChartArgs);
+});
+
 function renderCharts(salesTotal, paidTotal, debtTotal, t1, t2, t3) {
+  lastChartArgs = [salesTotal, paidTotal, debtTotal, t1, t2, t3];
   if (!window.Chart) return;
 
   const tickColor = cssVar('--text-muted') || '#94a3b8';
@@ -390,7 +396,7 @@ function renderCharts(salesTotal, paidTotal, debtTotal, t1, t2, t3) {
         plugins: {
           legend: {
             position: 'bottom',
-            labels: { color: legendColor, font: { family: 'Inter', size: 11 } }
+            labels: { color: legendColor, font: { family: "'Inter', system-ui, sans-serif", size: 11 } }
           }
         }
       }
