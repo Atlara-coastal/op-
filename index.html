@@ -228,6 +228,10 @@
         <button id="export-backup-btn" title="Descargar copia de seguridad JSON" class="btn-glass hidden md:flex p-2 rounded-xl transition-all text-xs font-medium flex items-center gap-1.5">
           <i data-lucide="download" class="w-4 h-4" style="color: var(--primary);"></i>        </button>
 
+        <button data-autobackup-open title="Copia automática diaria" style="display:none" class="btn-glass hidden md:flex p-2 rounded-xl transition-all text-xs font-medium flex items-center gap-1.5">
+          <i data-lucide="calendar-check" class="w-4 h-4" style="color: var(--primary);"></i>
+        </button>
+
         <label title="Restaurar copia de seguridad" class="btn-glass hidden md:flex p-2 rounded-xl transition-all text-xs font-medium flex items-center gap-1.5 cursor-pointer">
           <i data-lucide="upload" class="w-4 h-4" style="color: var(--primary);"></i>          <input type="file" id="import-backup-input" accept=".json" class="hidden">
         </label>
@@ -315,6 +319,9 @@
       <pre id="push-diag" class="hidden text-[11px] leading-relaxed p-3 rounded-xl whitespace-pre-wrap break-words" style="background: var(--bg-card-hover); border: 1px solid var(--border-color); color: var(--text-muted);"></pre>
 
       <div id="mobile-backup" class="md:hidden grid grid-cols-2 gap-2">
+        <button data-autobackup-open type="button" style="display:none" class="btn-glass col-span-2 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+          <i data-lucide="calendar-check" class="w-4 h-4" style="color: var(--primary);"></i> Copia automática diaria
+        </button>
         <button id="acc-export" type="button" class="btn-glass py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
           <i data-lucide="download" class="w-4 h-4" style="color: var(--primary);"></i> Copia
         </button>

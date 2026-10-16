@@ -3,7 +3,7 @@
  * Provides offline caching and mobile PWA installability
  */
 
-const CACHE_NAME = 'op-cache-v10';
+const CACHE_NAME = 'op-cache-v11';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ const ASSETS_TO_CACHE = [
   './tailwind.build.css',
   './manifest.json',
   './js/app.js',
+  './js/autobackup.js',
   './js/db.js',
   './js/utils.js',
   './js/theme.js',

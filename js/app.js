@@ -13,6 +13,7 @@ import { renderPortfolio } from './components/portfolio.js';
 import { renderToday } from './components/today.js';
 import { showToast } from './utils.js';
 import { initTheme } from './theme.js';
+import { initAutoBackup } from './autobackup.js';
 import { initAuth } from './auth.js';
 import { animateTabIn } from './animations.js';
 import { initPush } from './push.js';
@@ -213,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Pull cloud data (if configured) and keep the active tab live-synced
     // across devices; re-render the current tab whenever remote data changes.
-    db.connectCloud((collection) => {
+    const cloudReady = db.connectCloud((collection) => {
       window.app.switchTab(window.app.currentTab);
     });
 
@@ -225,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     initPush();
+    initAutoBackup(cloudReady);
   });
 
   // Register Service Worker for Mobile PWA
