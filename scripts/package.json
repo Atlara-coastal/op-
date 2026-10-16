@@ -1,1 +1,1 @@
-{ "private": true, "name": "jocoadmin-scripts", "dependencies": { "xlsx": "^0.18.5" } }
+{ "private": true, "name": "op-scripts", "dependencies": { "xlsx": "^0.18.5" } }
