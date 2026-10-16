@@ -390,7 +390,7 @@ function renderCharts(salesTotal, paidTotal, debtTotal, t1, t2, t3) {
         plugins: {
           legend: {
             position: 'bottom',
-            labels: { color: legendColor, font: { family: 'Outfit', size: 11 } }
+            labels: { color: legendColor, font: { family: 'Inter', size: 11 } }
           }
         }
       }
