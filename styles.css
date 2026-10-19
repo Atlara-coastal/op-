@@ -596,8 +596,10 @@ button, a, [role="button"], select, label { touch-action: manipulation; }
   input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea, .cs-btn { font-size: 16px !important; }
   .btn-primary, .btn-glass { min-height: 42px; }
   .glass-panel.p-5, .glass-panel.p-6, .glass-panel.p-7 { padding: 1rem; }
+}
 
-  /* Tables become cards */
+/* Tables become cards on phones, tablets and half-screen windows (8 columns don't fit there) */
+@media (max-width: 1023px) {
   table.stack-table { display: block; width: 100%; }
   table.stack-table thead { display: none; }
   table.stack-table tbody { display: block; }
@@ -612,7 +614,7 @@ button, a, [role="button"], select, label { touch-action: manipulation; }
     grid-column: 1 / -1; font-size: 13px;
   }
   table.stack-table td::before {
-    content: attr(data-label); flex-shrink: 0;
+    content: attr(data-label); flex-shrink: 0; font-family: 'Inter', system-ui, sans-serif;
     font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted);
   }
   table.stack-table td > * { min-width: 0; }
@@ -626,6 +628,11 @@ button, a, [role="button"], select, label { touch-action: manipulation; }
   table.stack-table td[colspan] { grid-column: 1 / -1; justify-content: center; }
   table.stack-table td[colspan]::before { display: none; }
   .overflow-x-auto:has(> table.stack-table) { overflow-x: visible; }
+}
+
+/* Laptop widths: tighter cells so wide tables keep every column in view */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  table.stack-table th, table.stack-table td { padding-left: .75rem !important; padding-right: .75rem !important; }
 }
 
 /* Modals turn into bottom sheets on phones */

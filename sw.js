@@ -3,7 +3,7 @@
  * Provides offline caching and mobile PWA installability
  */
 
-const CACHE_NAME = 'op-cache-v11';
+const CACHE_NAME = 'op-cache-v12';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
