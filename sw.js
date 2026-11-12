@@ -3,7 +3,7 @@
  * Provides offline caching and mobile PWA installability
  */
 
-const CACHE_NAME = 'op-cache-v12';
+const CACHE_NAME = 'op-cache-v16';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -23,6 +23,7 @@ const ASSETS_TO_CACHE = [
   './js/permissions.js',
   './js/users.js',
   './js/select-enhance.js',
+  './js/select-search.js',
   './js/mobile-ui.js',
   './js/pdf-doc.js',
   './js/reminder.js',
