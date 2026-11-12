@@ -5,6 +5,7 @@
 
 import { db } from '../db.js';
 import { formatCurrency, calculateProductPricing, showToast } from '../utils.js';
+import { esc } from '../pdf-doc.js';
 
 let editingProductId = null;
 let productsView = (() => { try { return localStorage.getItem('productsView') || 'cards'; } catch { return 'cards'; } })();
@@ -205,8 +206,8 @@ function renderTable(searchTerm = '') {
       <div class="p-4 rounded-2xl flex flex-col justify-between gap-4 transition-all" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
         <div class="space-y-2">
           <span class="font-mono text-[11px] font-semibold px-2 py-0.5 rounded inline-block" style="color: var(--primary); background: var(--primary-container);">${p.code}</span>
-          <h3 class="font-bold text-sm leading-snug" style="color: var(--text-main);">${p.name}</h3>
-          ${p.description && p.description !== `Categoría: ${p.category}` ? `<p class="text-xs line-clamp-2" style="color: var(--text-muted);">${p.description}</p>` : ''}
+          <h3 class="font-bold text-sm leading-snug" style="color: var(--text-main);">${esc(p.name)}</h3>
+          ${p.description && p.description !== `Categoría: ${p.category}` ? `<p class="text-xs line-clamp-2" style="color: var(--text-muted);">${esc(p.description)}</p>` : ''}
         </div>
         <div class="space-y-2">
           <div class="grid grid-cols-2 gap-2 text-xs">
@@ -256,8 +257,8 @@ function renderTable(searchTerm = '') {
       <tr class="transition-colors hover:bg-[var(--bg-card-hover)]">
         <td class="px-5 py-4 font-mono text-xs font-semibold" style="color: var(--primary);">${p.code}</td>
         <td class="px-5 py-4">
-          <div class="font-bold" style="color: var(--text-main);">${p.name}</div>
-          ${p.description && p.description !== `Categoría: ${p.category}` ? `<div class="text-xs line-clamp-1" style="color: var(--text-muted);">${p.description}</div>` : ''}
+          <div class="font-bold" style="color: var(--text-main);">${esc(p.name)}</div>
+          ${p.description && p.description !== `Categoría: ${p.category}` ? `<div class="text-xs line-clamp-1" style="color: var(--text-muted);">${esc(p.description)}</div>` : ''}
         </td>
         <td class="px-5 py-4 text-right font-mono" style="color: var(--text-main);">${formatCurrency(p.cost)}</td>
         <td class="px-5 py-4 text-center">

@@ -9,7 +9,13 @@ import { getDueToday, bogotaToday } from '../js/due.js';
 import { composeDueMessage, sendToTokens } from './_notify.js';
 
 export default async function handler(req, res) {
-  if (process.env.CRON_SECRET && req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error('[send-due-notifications] CRON_SECRET no configurado: se rechaza la petición.');
+    res.status(500).json({ error: 'CRON_SECRET no está configurado en el servidor.' });
+    return;
+  }
+  if (req.headers['authorization'] !== `Bearer ${cronSecret}`) {
     res.status(401).json({ error: 'No autorizado.' });
     return;
   }

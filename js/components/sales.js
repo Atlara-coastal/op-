@@ -6,6 +6,7 @@
 import { db } from '../db.js';
 import { getSellers, getMyUsername } from '../permissions.js';
 import { paper, docBox, esc, fitPaper, exportPdfById, brand } from '../pdf-doc.js';
+import { selectSearchBox, resetSelectSearch } from '../select-search.js';
 import { effectiveStatus, installmentValue, nextDue, bogotaToday } from '../due.js';
 import { formatCurrency, formatDate, repriceItems, showToast, generateWhatsAppPaymentReceipt, DEFAULT_INTEREST_RATE, termMonths, paymentsPerMonth, amortizationPrefill } from '../utils.js';
 
@@ -82,9 +83,10 @@ export function renderSales(container) {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Cliente Registrado *</label>
+              ${selectSearchBox('sale-client-id', 'Buscar cliente por nombre o cédula...', 'mb-2')}
               <select id="sale-client-id" required onchange="window.salesModule.onClientSelectChanged()" class="input-field w-full px-3 py-2 text-sm">
                 <option value="">-- Selecciona el Cliente --</option>
-                ${db.getCollection('clients').map(c => `<option value="${c.id}">${c.fullName} (CC: ${c.cc} - ${c.type})</option>`).join('')}
+                ${db.getCollection('clients').map(c => `<option value="${c.id}" data-search="${(c.fullName + ' ' + (c.cc || '') + ' ' + (c.phone || '')).toLowerCase()}">${c.fullName} (CC: ${c.cc || '—'} - ${c.type})</option>`).join('')}
               </select>
             </div>
             <div>
@@ -105,6 +107,7 @@ export function renderSales(container) {
           <!-- Add Products to Sale -->
           <div class="p-4 rounded-xl space-y-3" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
             <label class="block text-xs font-semibold uppercase tracking-wide" style="color: var(--primary);">Añadir Productos</label>
+            ${selectSearchBox('sale-select-product', 'Buscar producto por nombre...')}
             <div class="flex items-center gap-3">
               <select id="sale-select-product" class="input-field flex-1 px-3 py-2 text-sm">
                 <option value="">-- Elige un producto --</option>
@@ -221,7 +224,7 @@ export function renderSales(container) {
             <select id="pay-sale-id" required onchange="window.salesModule.onSelectSaleForPayment()" class="input-field w-full px-3 py-2 text-sm">
               <option value="">-- Selecciona una Venta --</option>
               ${sales.filter(s => s.outstandingBalance > 0).map(s => `
-                <option value="${s.id}">${s.saleNumber} - ${s.clientName} (Debe: ${formatCurrency(s.outstandingBalance)})</option>
+                <option value="${s.id}">${esc(s.saleNumber)} - ${esc(s.clientName)} (Debe: ${formatCurrency(s.outstandingBalance)})</option>
               `).join('')}
             </select>
           </div>
@@ -363,7 +366,7 @@ function renderSalesTable(searchTerm = '') {
     return `
       <tr class="transition-colors" style="border-color: var(--border-color);" onmouseover="this.style.background='var(--bg-card-hover)'" onmouseout="this.style.background='transparent'">
         <td class="px-3 xl:px-5 py-4 font-mono font-bold text-xs whitespace-nowrap" style="color: var(--primary);">${s.saleNumber}</td>
-        <td class="px-3 xl:px-5 py-4 font-semibold" style="color: var(--text-main);">${s.clientName}
+        <td class="px-3 xl:px-5 py-4 font-semibold" style="color: var(--text-main);">${esc(s.clientName)}
           <div class="text-[10px] font-normal uppercase mt-0.5" style="color: var(--text-muted);">${s.type} · ${s.sellerName || s.sellerUsername || '—'}</div>
           ${itemsText ? `<div class="text-[11px] font-normal mt-0.5 max-w-[240px] truncate" title="${esc(itemsText)}" style="color: var(--text-muted);">${esc(itemsText)}</div>` : ''}
         </td>
@@ -404,6 +407,8 @@ window.salesModule = {
   openSaleModal(prefilledQuote = null) {
     newSaleItems = [];
     document.getElementById('sale-form').reset();
+    resetSelectSearch('sale-client-id');
+    resetSelectSearch('sale-select-product');
     
     // Set default payment start date (today)
     document.getElementById('sale-start-date').value = bogotaToday();
@@ -1016,7 +1021,7 @@ window.salesModule = {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           ${field('Cliente', `<select id="es-client" class="${inp}">${clients.map(c => opt(c.id, s.clientId, c.fullName)).join('')}</select>`)}
           ${field('Vendedor (nombre)', `<input id="es-seller" type="text" value="${(s.sellerName || s.sellerUsername || '').replace(/"/g, '&quot;')}" class="${inp}">`)}
-          ${field('Usuario vendedor (para notificaciones)', `<input id="es-seller-user" type="text" value="${s.sellerUsername || ''}" class="${inp}">`)}
+          ${field('Usuario vendedor (para notificaciones)', `<input id="es-seller-user" type="text" value="${esc(s.sellerUsername || '')}" class="${inp}">`)}
           ${field('Fecha de venta', `<input id="es-date" type="date" value="${(s.date || s.createdAt || '').slice(0, 10)}" class="${inp}">`)}
           ${field('Tipo', `<select id="es-type" class="${inp}">${opt('credito', s.type, 'Crédito')}${opt('contado', s.type, 'Contado')}</select>`)}
           ${field('Frecuencia', `<select id="es-freq" class="${inp}">${opt('mensual', s.frequency, 'Mensual')}${opt('quincenal', s.frequency, 'Quincenal')}${opt('semanal', s.frequency, 'Semanal')}</select>`)}
@@ -1027,7 +1032,7 @@ window.salesModule = {
           ${field('Fecha de la primera cuota', `<input id="es-start" type="date" value="${s.startDate || ''}" class="${inp}">`)}
           ${field('Días de pago del mes (ej: 15,30)', `<input id="es-days" type="text" value="${days}" class="${inp}">`)}
         </div>
-        ${field('Notas', `<textarea id="es-notes" rows="2" class="${inp}">${s.notes || ''}</textarea>`)}
+        ${field('Notas', `<textarea id="es-notes" rows="2" class="${inp}">${esc(s.notes || '')}</textarea>`)}
         <p class="text-[11px]" style="color: var(--text-muted);">El total abonado se recalcula con la suma de los abonos registrados; el saldo y el estado se actualizan solos.</p>
         <div class="flex justify-between gap-2">
           <button type="button" onclick="window.salesModule.deleteSale('${s.id}')" class="px-3 py-2 rounded-xl text-xs font-semibold" style="color: #ef4444; border: 1px solid #ef4444;">Eliminar venta</button>

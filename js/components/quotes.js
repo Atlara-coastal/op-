@@ -6,8 +6,20 @@
 import { db } from '../db.js';
 import { formatCurrency, formatDate, repriceItems, termMonths, paymentsPerMonth, amortizationPrefill, DEFAULT_INTEREST_RATE, showToast } from '../utils.js';
 import { paper, docBox, esc, fitPaper, exportPdfById, brand } from '../pdf-doc.js';
+import { selectSearchBox, resetSelectSearch } from '../select-search.js';
 
 let quoteSelectedItems = [];
+
+// Closes the client live-search panel on outside click/Escape. Bound once at
+// module load because #quote-client-results is recreated with each render.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#quote-client-search, #quote-client-results')) {
+    document.getElementById('quote-client-results')?.classList.add('hidden');
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.getElementById('quote-client-results')?.classList.add('hidden');
+});
 
 export function renderQuotes(container) {
   const quotes = db.getCollection('quotes');
@@ -49,7 +61,7 @@ export function renderQuotes(container) {
               <div class="flex items-center justify-between pb-3" style="border-bottom: 1px solid var(--border-color);">
                 <div>
                   <span class="font-mono text-xs font-bold" style="color: var(--success);">${q.quoteNumber}</span>
-                  <h3 class="text-base font-bold leading-tight" style="color: var(--text-main);">${q.clientName}</h3>
+                  <h3 class="text-base font-bold leading-tight" style="color: var(--text-main);">${esc(q.clientName)}</h3>
                 </div>
                 <span class="px-2.5 py-1 rounded-full text-xs font-semibold" style="background: var(--bg-card-hover); color: var(--text-muted); border: 1px solid var(--border-color);">
                   ${q.installmentsCount} cuotas ${q.frequency}
@@ -113,6 +125,15 @@ export function renderQuotes(container) {
         <form id="quote-form" onsubmit="window.quotesModule.saveQuote(event)" class="space-y-4">
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Buscar cliente registrado</label>
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3" style="color: var(--text-muted);"></i>
+                <input type="text" id="quote-client-search" autocomplete="off" oninput="window.quotesModule.filterClients(this.value)" onfocus="window.quotesModule.filterClients(this.value)" placeholder="Escribe el nombre o la cédula..." class="input-field w-full pl-9 pr-4 py-2 text-sm">
+                <div id="quote-client-results" class="hidden absolute left-0 right-0 top-full mt-1 rounded-xl overflow-y-auto z-30" style="background: var(--bg-card-solid); border: 1px solid var(--border-color); box-shadow: var(--shadow-glow), 0 14px 34px rgba(0,0,0,.35); max-height: 240px;"></div>
+              </div>
+              <p class="text-[10px] mt-1" style="color: var(--text-muted);">Autocompleta nombre, teléfono y clasificación. También puedes escribir un cliente nuevo.</p>
+            </div>
             <div>
               <label class="block text-xs font-semibold mb-1" style="color: var(--text-muted);">Nombre del cliente</label>
               <input type="text" id="quote-client-name" required placeholder="Ej: Diana Torres" class="input-field w-full px-3 py-2 text-sm">
@@ -141,6 +162,7 @@ export function renderQuotes(container) {
           <!-- Add Product to Quote -->
           <div class="p-4 rounded-xl space-y-3" style="background: var(--bg-card-hover); border: 1px solid var(--border-color);">
             <label class="block text-xs font-semibold uppercase tracking-wide" style="color: var(--success);">Seleccionar Producto del Catálogo</label>
+            ${selectSearchBox('quote-select-product', 'Buscar producto por nombre...')}
             <div class="flex items-center gap-3">
               <select id="quote-select-product" class="input-field flex-1 px-3 py-2 text-sm">
                 <option value="">-- Elige un producto --</option>
@@ -253,6 +275,10 @@ window.quotesModule = {
   openModal() {
     quoteSelectedItems = [];
     document.getElementById('quote-form').reset();
+    resetSelectSearch('quote-select-product');
+    const clientSearch = document.getElementById('quote-client-search');
+    if (clientSearch) clientSearch.value = '';
+    document.getElementById('quote-client-results')?.classList.add('hidden');
     
     // Set default valid date (+15 days)
     const validDate = new Date();
@@ -371,6 +397,43 @@ window.quotesModule = {
         ? `Cuota inicial ${formatCurrency(t.initial)} · Financiado ${formatCurrency(t.financed)} · ${parseFloat(t.rate) || 0}% mensual sobre saldo, ${months} ${months === 1 ? 'mes' : 'meses'} · ${t.count} ${t.count === 1 ? 'pago' : `pagos ${t.frequency}es`}`
         : '';
     }
+  },
+
+  // Live search over the registered clients: picking one fills the quote's
+  // name, phone and classification, so the user doesn't retype a client that
+  // already exists (typing a brand new client by hand still works).
+  filterClients(query) {
+    const results = document.getElementById('quote-client-results');
+    if (!results) return;
+    const q = (query || '').trim().toLowerCase();
+    if (!q) { results.classList.add('hidden'); results.innerHTML = ''; return; }
+
+    const matches = db.getCollection('clients').filter(c =>
+      (c.fullName || '').toLowerCase().includes(q) ||
+      (c.cc || '').includes(q) ||
+      (c.phone || '').includes(q)
+    );
+
+    results.innerHTML = matches.length
+      ? matches.slice(0, 8).map(c => `
+          <div onclick="window.quotesModule.pickClient('${c.id}')" class="px-3 py-2.5 text-sm cursor-pointer" style="border-bottom: 1px solid var(--border-color);" onmouseover="this.style.background='var(--bg-card-hover)'" onmouseout="this.style.background='transparent'">
+            ${c.fullName}${c.cc ? ` <span class="text-xs font-mono" style="color: var(--text-muted);">CC: ${c.cc}</span>` : ''}
+          </div>
+        `).join('') + (matches.length > 8 ? `<div class="px-3 py-2 text-xs text-center" style="color: var(--text-muted);">+${matches.length - 8} más — sigue escribiendo para afinar</div>` : '')
+      : `<div class="px-3 py-3 text-xs text-center" style="color: var(--text-muted);">Sin resultados para "${query}"</div>`;
+    results.classList.remove('hidden');
+  },
+
+  pickClient(clientId) {
+    const client = db.getCollection('clients').find(c => c.id === clientId);
+    if (!client) return;
+    document.getElementById('quote-client-name').value = client.fullName || '';
+    document.getElementById('quote-client-phone').value = client.phone || '';
+    const type = document.getElementById('quote-client-type');
+    if (type && client.type) type.value = client.type;
+    const search = document.getElementById('quote-client-search');
+    if (search) search.value = client.fullName || '';
+    document.getElementById('quote-client-results')?.classList.add('hidden');
   },
 
   saveQuote(e) {

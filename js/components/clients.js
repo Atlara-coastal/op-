@@ -154,7 +154,7 @@ export function renderClients(container) {
             <label class="block text-xs font-semibold uppercase tracking-wide" style="color: var(--primary);">Codeudor Asignado</label>
             <select id="cli-codebtor" class="input-field w-full px-3 py-2 text-sm">
               <option value="">Sin Codeudor (Cliente Antiguo / Confiable)</option>
-              ${clients.map(c => `<option value="${c.id}">${c.fullName} (CC: ${c.cc || '—'})</option>`).join('')}
+              ${clients.map(c => `<option value="${c.id}">${esc(c.fullName)} (CC: ${esc(c.cc || '—')})</option>`).join('')}
             </select>
           </div>
 
@@ -306,11 +306,11 @@ function renderCards() {
                 const m = metrics(c);
                 return `
                 <tr class="transition-colors hover:bg-[var(--bg-card-hover)]">
-                  <td class="px-4 py-3"><div class="font-bold" style="color: var(--text-main);">${c.fullName}</div><div class="text-[11px] font-mono">CC: ${c.cc || '—'}</div></td>
+                  <td class="px-4 py-3"><div class="font-bold" style="color: var(--text-main);">${esc(c.fullName)}</div><div class="text-[11px] font-mono">CC: ${esc(c.cc || '—')}</div></td>
                   <td class="px-4 py-3">${getClientTypeBadgeHtml(c.type)}</td>
-                  <td class="px-4 py-3 whitespace-nowrap">${c.phone || '—'}</td>
+                  <td class="px-4 py-3 whitespace-nowrap">${esc(c.phone || '—')}</td>
                   <td class="px-4 py-3 text-xs whitespace-nowrap">${c.place ? `<span class="px-2 py-0.5 rounded-full font-semibold" style="background: var(--primary-container); color: var(--primary);">${esc(c.place)}</span>` : '—'}</td>
-                  <td class="px-4 py-3 text-xs max-w-[11rem] truncate">${c.address || '—'}</td>
+                  <td class="px-4 py-3 text-xs max-w-[11rem] truncate">${esc(c.address || '—')}</td>
                   <td class="px-4 py-3 text-right font-mono" style="color: var(--text-main);">${formatCurrency(m.purchases)}</td>
                   <td class="px-4 py-3 text-right font-mono font-bold" style="color: ${m.debt > 0 ? 'var(--warning)' : 'var(--success)'};">${formatCurrency(m.debt)}</td>
                   <td class="px-4 py-3">
@@ -341,8 +341,8 @@ function renderCards() {
         <div class="space-y-3">
           <div class="flex items-start justify-between gap-2 pb-3" style="border-bottom: 1px solid var(--border-color);">
             <div>
-              <h3 class="font-bold text-base leading-snug" style="color: var(--text-main);">${c.fullName}</h3>
-              <p class="text-xs font-mono" style="color: var(--text-muted);">CC: ${c.cc || '—'}</p>
+              <h3 class="font-bold text-base leading-snug" style="color: var(--text-main);">${esc(c.fullName)}</h3>
+              <p class="text-xs font-mono" style="color: var(--text-muted);">CC: ${esc(c.cc || '—')}</p>
             </div>
             <div>
               ${getClientTypeBadgeHtml(c.type)}
@@ -351,10 +351,10 @@ function renderCards() {
 
           <div class="space-y-1.5 text-xs" style="color: var(--text-muted);">
             <div class="flex items-center gap-2">
-              <i data-lucide="phone" class="w-3.5 h-3.5" style="color: var(--text-muted);"></i> ${c.phone || 'Sin teléfono'}
+              <i data-lucide="phone" class="w-3.5 h-3.5" style="color: var(--text-muted);"></i> ${esc(c.phone || 'Sin teléfono')}
             </div>
             <div class="flex items-center gap-2">
-              <i data-lucide="map-pin" class="w-3.5 h-3.5" style="color: var(--text-muted);"></i> ${c.address || 'Sin dirección'}
+              <i data-lucide="map-pin" class="w-3.5 h-3.5" style="color: var(--text-muted);"></i> ${esc(c.address || 'Sin dirección')}
             </div>
             <div class="flex items-center gap-2">
               <i data-lucide="map" class="w-3.5 h-3.5" style="color: var(--text-muted);"></i> Lugar: <strong style="color: var(--text-main);">${c.place ? esc(c.place) : 'Sin lugar'}</strong>
@@ -544,8 +544,8 @@ window.clientsModule = {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs" style="color: var(--text-muted);">
           <div><strong style="color: var(--text-main);">Correo:</strong> ${c.email || 'No registrado'}</div>
-          <div><strong style="color: var(--text-main);">Teléfono:</strong> ${c.phone || 'No registrado'}</div>
-          <div><strong style="color: var(--text-main);">Dirección:</strong> ${c.address || 'No registrada'}</div>
+          <div><strong style="color: var(--text-main);">Teléfono:</strong> ${esc(c.phone || 'No registrado')}</div>
+          <div><strong style="color: var(--text-main);">Dirección:</strong> ${esc(c.address || 'No registrada')}</div>
           <div><strong style="color: var(--text-main);">Lugar:</strong> ${c.place ? esc(c.place) : 'No registrado'}</div>
           <div><strong style="color: var(--text-main);">Codeudor:</strong> ${c.codebtorName}</div>
         </div>

@@ -21,6 +21,7 @@ import './reminder.js';
 import './calculator.js';
 import './promo.js';
 import { initSelects } from './select-enhance.js';
+import { initSelectSearch } from './select-search.js';
 import { initMobileUI } from './mobile-ui.js';
 import { canView, canEdit, firstAllowedTab, applyReadOnlyUI, isAdmin } from './permissions.js';
 
@@ -201,6 +202,7 @@ function updateSyncBadge(count) {
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   initSelects();
+  initSelectSearch();
   initMobileUI();
 
   // Tell Capgo the app booted fine (only present inside the native Android

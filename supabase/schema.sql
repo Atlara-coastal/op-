@@ -56,18 +56,11 @@ alter table public.sales    enable row level security;
 alter table public.payments enable row level security;
 alter table public.quotes   enable row level security;
 
-do $$
-declare
-  t text;
-begin
-  foreach t in array array['products', 'clients', 'sales', 'payments', 'quotes']
-  loop
-    execute format(
-      'create policy "authenticated_full_access" on public.%I for all to authenticated using (true) with check (true);',
-      t
-    );
-  end loop;
-end $$;
+-- No policies are created here on purpose: with RLS enabled and no policy the
+-- tables deny everything, so a fresh project stays closed until the migrations
+-- run. The real per-permission and per-tenant policies live in
+-- supabase/migrations/0004_roles.sql and 0006_tenants.sql. Never re-add an
+-- `using (true)` policy here.
 
 -- Realtime: broadcast changes so every open device/tab updates live.
 alter publication supabase_realtime add table public.products;
